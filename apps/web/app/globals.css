@@ -1,0 +1,18 @@
+/*
+  COPY-FROM-V1: replace this file with apps/web/styles/globals.css and apps/web/styles/shadcn.css
+  contents from your existing repo (the Tailwind v4 + shadcn token setup).
+
+  Quick-start placeholder so the project builds:
+*/
+@import 'tailwindcss';
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, -apple-system, sans-serif;
+}

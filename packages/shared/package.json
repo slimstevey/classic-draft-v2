@@ -1,0 +1,22 @@
+{
+  "name": "@repo/shared",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    "./types": "./src/types.ts",
+    "./states": "./src/states/index.ts",
+    "./constants": "./src/constants.ts",
+    "./utils": "./src/utils/index.ts"
+  },
+  "scripts": {
+    "lint": "echo skip",
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "@colyseus/schema": "^3.0.39"
+  }
+}
