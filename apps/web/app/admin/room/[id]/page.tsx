@@ -1,6 +1,7 @@
 'use client'
 
 import { COLYSEUS_HTTP } from '@/libs/colyseus'
+import { useAuthStore } from '@/stores/auth'
 import { useBanningStore } from '@/stores/banning'
 import { useRoomStore } from '@/stores/room'
 import { useStatusStore } from '@/stores/status'
@@ -28,6 +29,36 @@ export default function AdminRoomPage() {
   const { id } = useParams<{ id: string }>()
   const { instance } = useRoomStore()
   const { warriors } = useBanningStore()
+  const { playerToken } = useAuthStore()
+  const [creatingRoom, setCreatingRoom] = useState(false)
+
+  const createNewRoom = async () => {
+    if (!playerToken) {
+      setInfo('Not authenticated — go to /admin first')
+      return
+    }
+    setCreatingRoom(true)
+    try {
+      const res = await fetch(`${COLYSEUS_HTTP}/create-room`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${playerToken}` },
+        body: JSON.stringify({}),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        setInfo(j.error ?? `Failed (HTTP ${res.status})`)
+        return
+      }
+      const data: { roomId: string; joinCodes: { side: string; code: string }[] } = await res.json()
+      localStorage.setItem(`acd:joinCodes:${data.roomId}`, JSON.stringify(data.joinCodes))
+      window.open(`/admin/room/${data.roomId}`, '_blank')
+      setInfo(`New room created: ${data.roomId} — opened in new tab`)
+    } catch (err) {
+      setInfo(err instanceof Error ? err.message : 'Failed to create room')
+    } finally {
+      setCreatingRoom(false)
+    }
+  }
   const { status, phase, turn, countdown, isBufferTime } = useStatusStore()
 
   // Form state
@@ -184,7 +215,15 @@ export default function AdminRoomPage() {
       <div className='max-w-5xl mx-auto flex flex-col gap-6'>
         <header className='flex items-start justify-between gap-4'>
           <div>
-            <h1 className='text-2xl font-bold'>Admin Room</h1>
+            <div className='flex items-center gap-3'>
+              <h1 className='text-2xl font-bold'>Admin Room</h1>
+              <button
+                onClick={createNewRoom}
+                disabled={creatingRoom}
+                className='px-3 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white text-sm font-semibold rounded shadow'>
+                {creatingRoom ? 'Creating…' : '+ New Room'}
+              </button>
+            </div>
             <div className='text-sm opacity-70 mt-1'>
               ID: <code className='font-mono'>{id}</code>
             </div>
