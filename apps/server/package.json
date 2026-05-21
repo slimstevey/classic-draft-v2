@@ -23,13 +23,11 @@
     "typescript": "^5.0.4"
   },
   "dependencies": {
-    "@colyseus/bun-websockets": "0.16.4",
     "@colyseus/command": "0.3.2",
     "@colyseus/core": "0.16.5",
     "@colyseus/monitor": "0.16.0",
     "@colyseus/playground": "0.16.4",
     "@colyseus/schema": "3.0.39",
-    "@colyseus/tools": "0.16.20",
     "@colyseus/ws-transport": "0.16.5",
     "@repo/shared": "*",
     "colyseus": "0.16.5",
