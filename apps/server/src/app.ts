@@ -14,7 +14,10 @@ import { Encoder } from '@colyseus/schema'
 
 Encoder.BUFFER_SIZE = 32 * 1024
 
-matchMaker.controller.exposedMethods = ['reconnect', 'joinById']
+// FORCE seat reservation to 60 seconds (default is 8s which is too aggressive)
+// This MUST run before any rooms are defined.
+;(matchMaker as any).controller.exposedMethods = ['reconnect', 'joinById']
+process.env.COLYSEUS_SEAT_RESERVATION_TIME = '60'
 
 export default config({
   initializeGameServer: (gameServer) => {
@@ -140,6 +143,7 @@ export default config({
   beforeListen: () => {
     console.log(`[server] starting on port ${env.PORT}, env=${env.NODE_ENV}`)
     console.log(`[server] admin discord IDs:`, env.ADMIN_DISCORD_IDS)
+    console.log(`[server] seat reservation time: ${process.env.COLYSEUS_SEAT_RESERVATION_TIME}s`)
   },
 })
 
