@@ -39,45 +39,21 @@ import {
 } from '@repo/shared/types'
 import { getBanningConfig, toMs } from '@repo/shared/utils'
 
-/**
- * BanningRoom — the core room implementing the Axie Classic draft state machine.
- *
- * Timer model (the key bug fix from v1):
- *   - We store `endsAt` (absolute server clock time when the current turn ends).
- *   - We tick a 1s interval that BROADCASTS the remaining time computed from `endsAt - now`.
- *     Drift is impossible because `endsAt` never moves.
- *   - We schedule a single `setTimeout` to fire at `endsAt` that hands off to `handleTurnCompletion`.
- *
- * Disconnect handling:
- *   - The timer NEVER pauses for a disconnected warrior. It keeps running.
- *   - `connected` flag on warrior is updated via onLeave/onJoin and synced to clients.
- *   - Admin can call FORCE_SKIP_TURN at any time to immediately advance.
- *   - If the active warrior is disconnected when the timer expires, their pending bans are
- *     forfeited and the draft advances normally.
- *   - Reconnection is allowed for RECONNECTION_WINDOW_SECONDS; on reconnect the warrior keeps
- *     all their state because it's keyed by discordId, not sessionId.
- */
 export class BanningRoom extends Room<BanningState> {
   state = new BanningState()
   dispatcher = new Dispatcher(this)
-  maxClients = 20 // 2 warriors + admins/spectators
+  maxClients = 20
 
   private tickInterval: Delayed | null = null
   private endTimeout: Delayed | null = null
-
-  // Map of pending reconnection promise cleanups so we can cancel on dispose.
   private reconnectAborts = new Set<() => void>()
 
   onCreate(options: CreateRoomOptions) {
-    // Custom room ID — short and shareable.
     this.roomId = generateRoomId()
     this.setMetadata({ createdAt: Date.now() })
 
     this.dispatcher.dispatch(new OnCreateCommand(), {})
 
-    // Pre-seed empty warrior slots with their join codes. The admin's first
-    // UPDATE_ROOM_CONFIG call will fill in display names, pools, etc. The slots
-    // are addressable by side and join code starting from this point.
     if (options.joinCodes && options.joinCodes.length > 0) {
       options.joinCodes.forEach(({ side, code }) => {
         const slot = new Warrior()
@@ -94,11 +70,10 @@ export class BanningRoom extends Room<BanningState> {
     this.setSimulationInterval((_dt) => this.update())
   }
 
-
   async onAuth(_client: Client, options: any) {
     const role = options.__role
-    if (role === 'SPECTATOR') {
-      return { role: 'SPECTATOR' }
+    if (role === 'spectator') {
+      return { role: 'spectator' }
     }
     if (!options.playerToken) {
       throw new Error('Missing playerToken')
@@ -107,27 +82,26 @@ export class BanningRoom extends Room<BanningState> {
     if (!player) {
       throw new Error('Invalid playerToken')
     }
-    if (role === 'ADMIN') {
+    if (role === 'admin') {
       if (!isAdminDiscordId(player.discordId)) {
         throw new Error('Not an admin')
       }
       return {
-        role: 'ADMIN',
+        role: 'admin',
         discordId: player.discordId,
         discordUsername: player.discordUsername,
         discordAvatar: player.discordAvatar,
       }
     }
-	if (role === 'WARRIOR') {
-  	// TEMP: allow admin Discord to test warrior flow if ALLOW_ADMIN_AS_WARRIOR is set
-  if (isAdminDiscordId(player.discordId) && process.env.ALLOW_ADMIN_AS_WARRIOR !== 'true') {
-    throw new Error('Admins cannot join as warriors')
-  }
+    if (role === 'warrior') {
+      if (isAdminDiscordId(player.discordId) && process.env.ALLOW_ADMIN_AS_WARRIOR !== 'true') {
+        throw new Error('Admins cannot join as warriors')
+      }
       if (!options.joinCode) {
         throw new Error('Missing joinCode')
       }
       return {
-        role: 'WARRIOR',
+        role: 'warrior',
         discordId: player.discordId,
         discordUsername: player.discordUsername,
         discordAvatar: player.discordAvatar,
@@ -140,7 +114,7 @@ export class BanningRoom extends Room<BanningState> {
   onJoin(client: Client, _options: any, auth: any) {
     this.dispatcher.dispatch(new OnJoinCommand(), {
       sessionId: client.sessionId,
-      role: auth?.role ?? 'SPECTATOR',
+      role: auth?.role ?? 'spectator',
       discordId: auth?.discordId,
       discordUsername: auth?.discordUsername,
       discordAvatar: auth?.discordAvatar ?? null,
@@ -152,29 +126,18 @@ export class BanningRoom extends Room<BanningState> {
     const warrior = this.state.findWarriorBySession(client.sessionId)
     const operator = this.state.operators.get(client.sessionId)
 
-    // Warrior path
     if (warrior) {
       warrior.connected = false
+      if (consented) return
 
-      if (consented) {
-        // Player left on purpose — don't hold their seat.
-        return
-      }
-
-      // Allow reconnection within RECONNECTION_WINDOW_SECONDS. Timer keeps running during this
-      // window — see class header for rationale.
       try {
         await this.allowReconnection(client, RECONNECTION_WINDOW_SECONDS)
-        // On reconnect, the new client will have a fresh sessionId. onJoin re-binds by discordId.
-        // The `warrior.connected = true` flip happens in OnJoinCommand.
       } catch {
-        // Reconnection window expired. Warrior remains in state but `connected = false`.
-        // Admin can choose to leave the slot, or kick & reuse the join code.
+        // Reconnection window expired.
       }
       return
     }
 
-    // Operator path
     if (operator) {
       this.state.operators.delete(client.sessionId)
     }
@@ -187,10 +150,6 @@ export class BanningRoom extends Room<BanningState> {
     this.reconnectAborts.clear()
     this.dispatcher.stop()
   }
-
-  // ====================================================================
-  // Messaging
-  // ====================================================================
 
   private registerMessages() {
     this.onMessage(MESSAGES.UPDATE_ROOM_CONFIG, (client, message: UpdateRoomConfigPayload) => {
@@ -250,19 +209,11 @@ export class BanningRoom extends Room<BanningState> {
     })
   }
 
-  // ====================================================================
-  // Simulation loop — auto-start when both warriors are ready
-  // ====================================================================
-
   private update() {
     if (this.state.status === 'ready' && isAllPlayersReady(this.state.warriors)) {
       this.startBanning()
     }
   }
-
-  // ====================================================================
-  // Phase / turn orchestration
-  // ====================================================================
 
   startBanning() {
     this.state.status = 'banning'
@@ -286,12 +237,9 @@ export class BanningRoom extends Room<BanningState> {
   private startPhaseTwo() {
     this.state.phase = 2
     this.state.turn = 1
-
-    // Initialise per-warrior buffer time once at the start of phase 2.
     this.state.warriors.forEach((w) => {
       w.bufferTime = toMs(BANNING_BUFFER_TIME)
     })
-
     this.startPhaseTwoTurnOne()
   }
 
@@ -326,17 +274,6 @@ export class BanningRoom extends Room<BanningState> {
     this.broadcast(MESSAGES.COUNTDOWN_UPDATE, this.makeCountdownPayload())
   }
 
-  // ====================================================================
-  // Generic turn runner — replaces the original two near-duplicate functions
-  // ====================================================================
-
-  /**
-   * Run a single turn:
-   *   - Set bannedCount on the indicated warriors.
-   *   - Compute endsAt = now + duration (+ small display offset).
-   *   - Start a 1s tick interval that BROADCASTS remaining time (no decrement-based state).
-   *   - Schedule end timeout that calls handleTurnCompletion(nextStep).
-   */
   private runTurn(
     phase: number,
     turn: number,
@@ -360,16 +297,14 @@ export class BanningRoom extends Room<BanningState> {
 
     this.broadcast(MESSAGES.COUNTDOWN_UPDATE, this.makeCountdownPayload())
 
-    // Tick every second, broadcasting the (derived) remaining time.
     this.tickInterval = this.clock.setInterval(() => {
       this.broadcast(MESSAGES.COUNTDOWN_UPDATE, this.makeCountdownPayload())
     }, 1000)
 
-    // Single end-of-turn timeout. Always fires exactly once.
     this.endTimeout = this.clock.setTimeout(() => {
       this.tickInterval?.clear()
       this.tickInterval = null
-      this.state.endsAt = this.clock.currentTime // freeze at 0 remaining
+      this.state.endsAt = this.clock.currentTime
 
       if (opts.useBufferOnExpiry) {
         this.handleTurnCompletionWithBuffer(nextStep)
@@ -379,30 +314,19 @@ export class BanningRoom extends Room<BanningState> {
     }, durationMs)
   }
 
-  /**
-   * Phase 2 only: when a turn's main countdown expires and the active warrior still has
-   * pending bans AND has buffer time remaining, switch into buffer-time mode.
-   *
-   * Buffer time is per-warrior, accumulated across turns. We tick it down and check each
-   * tick whether the warrior has finished banning (in which case we advance early) or
-   * exhausted their buffer (in which case we advance and forfeit remaining bans).
-   */
   private handleTurnCompletionWithBuffer(nextStep: () => void) {
     const active = this.getActiveWarrior()
 
-    // No active warrior or no pending bans → advance immediately.
     if (!active || active.bannedCount === 0) {
       nextStep()
       return
     }
 
-    // No buffer time available → advance, forfeiting the bans.
     if (active.bufferTime <= 0) {
       nextStep()
       return
     }
 
-    // Enter buffer time. We schedule a single tick interval and a final timeout.
     this.state.isBufferTime = true
     const bufferDurationMs = active.bufferTime
     const now = this.clock.currentTime
@@ -414,12 +338,10 @@ export class BanningRoom extends Room<BanningState> {
     const startedAt = now
 
     this.tickInterval = this.clock.setInterval(() => {
-      // Decrement the warrior's accumulated buffer based on real elapsed time.
       const elapsed = this.clock.currentTime - startedAt
       active.bufferTime = Math.max(0, bufferDurationMs - elapsed)
       this.broadcast(MESSAGES.COUNTDOWN_UPDATE, this.makeCountdownPayload())
 
-      // Early exit: warrior finished their bans.
       if (active.bannedCount === 0) {
         this.clearAllTimers()
         this.state.isBufferTime = false
@@ -435,14 +357,6 @@ export class BanningRoom extends Room<BanningState> {
     }, bufferDurationMs)
   }
 
-  // ====================================================================
-  // Public API exposed to commands
-  // ====================================================================
-
-  /**
-   * Called by BanAxieCommand after a successful ban. If all required bans this turn are
-   * done, we advance early (cancelling timers).
-   */
   checkAndAdvanceBanning() {
     const hasPending = this.state.warriors.some((w) => w.isBanning && w.bannedCount > 0)
     if (hasPending) return
@@ -455,10 +369,6 @@ export class BanningRoom extends Room<BanningState> {
     this.advanceFromCurrentTurn()
   }
 
-  /**
-   * Called by ForceSkipTurnCommand. Admin manually advances regardless of pending bans.
-   * Pending bans are forfeited.
-   */
   forceSkipCurrentTurn() {
     this.clearAllTimers()
     this.state.endsAt = this.clock.currentTime
@@ -468,9 +378,6 @@ export class BanningRoom extends Room<BanningState> {
     this.advanceFromCurrentTurn()
   }
 
-  /**
-   * Determine which step comes next based on the current phase/turn and call into it.
-   */
   private advanceFromCurrentTurn() {
     if (this.state.status !== 'banning') return
 
@@ -494,9 +401,6 @@ export class BanningRoom extends Room<BanningState> {
     }
   }
 
-  /**
-   * Called by ResetBanCommand. Clears all timers and resets game state to 'initial'.
-   */
   resetGame() {
     this.clearAllTimers()
     this.state.status = 'initial'
@@ -517,10 +421,6 @@ export class BanningRoom extends Room<BanningState> {
     })
     this.broadcast(MESSAGES.COUNTDOWN_UPDATE, this.makeCountdownPayload())
   }
-
-  // ====================================================================
-  // Helpers
-  // ====================================================================
 
   private getActiveWarrior() {
     return this.state.warriors.find((w) => w.isBanning && w.bannedCount > 0)
@@ -550,10 +450,6 @@ export class BanningRoom extends Room<BanningState> {
   }
 }
 
-/**
- * Generate a short, human-friendly room ID (lowercase alphanumeric, 6 chars).
- * Random enough to avoid collisions in practice; matchMaker handles dup retries.
- */
 function generateRoomId(): string {
   const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
   let s = ''

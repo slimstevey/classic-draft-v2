@@ -1,6 +1,6 @@
 'use client'
 
-import colyseus, { COLYSEUS_HTTP } from '@/libs/colyseus'
+import colyseus from '@/libs/colyseus'
 import { useAuthStore } from '@/stores/auth'
 import { useBanningStore } from '@/stores/banning'
 import { useRoomStore } from '@/stores/room'
@@ -64,7 +64,6 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
       let room: Room<BanningState> | null = null
 
       try {
-        // Use joinById directly — Colyseus client handles reservation + WS in one shot
         const options = await buildJoinOptions(mode, roomId, { playerToken })
         if (options === null) {
           setErrorMsg('Missing auth or join code for this mode')
@@ -163,14 +162,13 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
 
 async function buildJoinOptions(mode: Mode, roomId: string, auth: { playerToken: string | null }) {
   if (mode === 'spectator') {
-    return { __role: 'SPECTATOR' }
+    return { __role: 'spectator' }
   }
   if (!auth.playerToken) return null
   if (mode === 'warrior') {
     const joinCode = typeof window !== 'undefined' ? localStorage.getItem(`acd:joinCode:${roomId}`) : null
     if (!joinCode) return null
-    return { __role: 'WARRIOR', playerToken: auth.playerToken, joinCode }
+    return { __role: 'warrior', playerToken: auth.playerToken, joinCode }
   }
-  // admin
-  return { __role: 'ADMIN', playerToken: auth.playerToken }
+  return { __role: 'admin', playerToken: auth.playerToken }
 }
