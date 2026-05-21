@@ -49,7 +49,11 @@ export default function PageClient() {
   const showPhase2Banner = status === 'banning' && phase === 2 && activeBanner
 
   return (
-    <main className='min-h-screen bg-gradient-to-b from-emerald-900 to-emerald-950 text-white p-6 pb-72'>
+    <main
+      className='min-h-screen text-white p-6 pb-72 bg-no-repeat bg-cover bg-center bg-fixed'
+      style={{
+        backgroundImage: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.75)), url('/banner.webp')",
+      }}>
       <header className='flex items-center justify-center mb-6'>
         <div className='text-center'>
           <div className='text-5xl font-mono font-bold'>{seconds}s</div>

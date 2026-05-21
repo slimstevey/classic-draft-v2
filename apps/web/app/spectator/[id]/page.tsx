@@ -22,7 +22,11 @@ export default function PageClient() {
   const inspectedAxie = inspector?.inspectedAxieId ? axies.find((a: any) => a.id === inspector.inspectedAxieId) : null
 
   return (
-    <main className='min-h-screen bg-gradient-to-b from-emerald-900 to-emerald-950 text-white p-6 pb-72'>
+    <main
+      className='min-h-screen text-white p-6 pb-72 bg-no-repeat bg-cover bg-center bg-fixed'
+      style={{
+        backgroundImage: "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.75)), url('/banner.webp')",
+      }}>
       <header className='flex items-center justify-between mb-6'>
         <div className='text-2xl font-bold'>{left?.displayName || 'Left'}</div>
         <div className='text-center'>
