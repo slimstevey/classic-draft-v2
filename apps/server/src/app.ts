@@ -19,7 +19,13 @@ Encoder.BUFFER_SIZE = 32 * 1024
 ;(matchMaker as any).controller.exposedMethods = ['reconnect', 'joinById']
 process.env.COLYSEUS_SEAT_RESERVATION_TIME = '60'
 
+import { LocalDriver, LocalPresence } from '@colyseus/core'
+
 export default config({
+  options: {
+    driver: new LocalDriver(),
+    presence: new LocalPresence(),
+  },
   initializeGameServer: (gameServer) => {
     gameServer.define('banning', BanningRoom)
   },

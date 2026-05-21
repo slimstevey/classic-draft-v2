@@ -1,6 +1,6 @@
-// MUST be set BEFORE any colyseus import
-process.env.COLYSEUS_SEAT_RESERVATION_TIME = '300'
+process.env.COLYSEUS_SEAT_RESERVATION_TIME = '60'
 
+import { LocalDriver } from '@colyseus/core'
 import { listen } from '@colyseus/tools'
 import app from './app'
 
