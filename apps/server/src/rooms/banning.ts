@@ -118,10 +118,11 @@ export class BanningRoom extends Room<BanningState> {
         discordAvatar: player.discordAvatar,
       }
     }
-    if (role === 'WARRIOR') {
-      if (isAdminDiscordId(player.discordId)) {
-        throw new Error('Admins cannot join as warriors')
-      }
+	if (role === 'WARRIOR') {
+  	// TEMP: allow admin Discord to test warrior flow if ALLOW_ADMIN_AS_WARRIOR is set
+  if (isAdminDiscordId(player.discordId) && process.env.ALLOW_ADMIN_AS_WARRIOR !== 'true') {
+    throw new Error('Admins cannot join as warriors')
+  }
       if (!options.joinCode) {
         throw new Error('Missing joinCode')
       }
