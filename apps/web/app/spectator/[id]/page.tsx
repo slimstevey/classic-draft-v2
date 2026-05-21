@@ -55,34 +55,20 @@ export default function PageClient() {
         </section>
       </div>
 
-      {/* Inspection preview (shown when a warrior clicks an axie) */}
+      {/* Inspection preview - just big axie image */}
       {inspectedAxie && phase >= 2 && (
         <div className='fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-sm border-t-2 border-blue-400/50 p-4 z-40'>
-          <div className='max-w-5xl mx-auto flex items-center gap-6'>
-            <div className='text-sm font-bold text-blue-300'>{inspector?.displayName} is looking at:</div>
+          <div className='max-w-3xl mx-auto flex items-center justify-center gap-6'>
             <img
               src={computeAxieImageUrl(inspectedAxie.id)}
               alt={inspectedAxie.id}
-              className='w-32 h-32 object-contain flex-shrink-0'
+              className='w-48 h-48 object-contain flex-shrink-0'
               draggable={false}
             />
-            <div className='flex-1'>
-              <div className='text-xl font-bold mb-1'>#{inspectedAxie.id}</div>
-              <div className='text-xs opacity-70 mb-2'>side: {inspectedAxie.side} {inspectedAxie.isBanned && '· BANNED'}</div>
-              <div className='grid grid-cols-2 gap-2'>
-                {(inspectedAxie.cards || []).map((card: any) => (
-                  <div key={card.id} className='flex items-center gap-2 bg-white/10 rounded p-2'>
-                    <img src={computeAxieCardUrl(card)} alt={card.id} className='w-10 h-10 rounded' />
-                    <div className='text-xs'>
-                      <div className='font-mono opacity-70'>{card.id}</div>
-                      <div className='flex gap-3 mt-1'>
-                        <span>⚔️ {card.attack}</span>
-                        <span>🛡️ {card.defense}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div>
+              <div className='text-sm font-bold text-blue-300 mb-1'>{inspector?.displayName} is looking at:</div>
+              <div className='text-2xl font-bold'>#{inspectedAxie.id}</div>
+              <div className='text-xs opacity-70'>{inspectedAxie.side} side{inspectedAxie.isBanned && ' · BANNED'}</div>
             </div>
           </div>
         </div>
