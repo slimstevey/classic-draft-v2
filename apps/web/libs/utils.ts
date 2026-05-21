@@ -7,3 +7,6 @@ export function cn(...inputs: ClassValue[]) {
 
 export const computeAxieImageUrl = (id: string) =>
   `https://axiecdn.axieinfinity.com/axies/${id}/axie/axie-full-transparent.png`
+
+export const computeAxieCardUrl = (card: { id: string }) =>
+  `/card-small/${card.id}.webp`
