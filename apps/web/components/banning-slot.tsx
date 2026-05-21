@@ -1,16 +1,14 @@
-'use client'
-
-import { SLOT_CONFIGS } from '@/configs/slot'
-import { useInspector } from '@/hooks/use-inspector'
-import { cn, computeAxieImageUrl } from '@/libs/utils'
 import { useBanningStore } from '@/stores/banning'
 import { useRoomStore } from '@/stores/room'
 import { useStatusStore } from '@/stores/status'
+import { useAuthStore } from '@/stores/auth'
+import { useInspector } from '@/hooks/use-inspector'
+import { SLOT_CONFIGS } from '@/configs/slot'
+import { cn, computeAxieImageUrl } from '@/libs/utils'
 import { MESSAGES } from '@repo/shared/constants'
 import { Axie, Side } from '@repo/shared/types'
 import Image from 'next/image'
 import { useMemo } from 'react'
-import { useAccount } from 'wagmi'
 
 interface BanningSlotProps {
   slotConfig: (typeof SLOT_CONFIGS)[number]
@@ -20,38 +18,31 @@ interface BanningSlotProps {
 }
 
 export function BanningSlot({ axie, slotConfig, onClick }: BanningSlotProps) {
-  const { address } = useAccount()
+  const { discordId } = useAuthStore()
   const { warriors } = useBanningStore()
   const { instance } = useRoomStore()
   const { phase } = useStatusStore()
 
   const { isInspector } = useInspector()
 
-  const you = warriors.find((warrior) => warrior.discordId === address?.toLowerCase())
+  const you = warriors.find((warrior) => warrior.discordId === discordId)
 
   const allowToBan = you?.isBanning && axie.side !== you.side
 
   const shouldShowIndicator = useMemo(() => {
     if (isInspector) {
-      if (phase > 1) {
-        return true
-      }
+      if (phase > 1) return true
       return false
     }
-
     if (phase < 2) {
-      if (axie.side !== you?.side) {
-        return true
-      }
+      if (axie.side !== you?.side) return true
       return false
     }
     return true
-  }, [phase, axie.side, you?.side])
+  }, [phase, axie.side, you?.side, isInspector])
 
   const handleBan = () => {
-    instance?.send(MESSAGES.BAN_AXIE, {
-      axie,
-    })
+    instance?.send(MESSAGES.BAN_AXIE, { axie })
   }
 
   return (

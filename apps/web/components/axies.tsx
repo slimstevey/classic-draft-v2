@@ -10,16 +10,16 @@ import { useStatusStore } from '@/stores/status'
 import { Card } from '@repo/shared/types'
 import Image from 'next/image'
 import { useEffect, useMemo, useRef } from 'react'
-import { useAccount } from 'wagmi'
+import { useAuthStore } from '@/stores/auth'
 
 export default function Axies() {
   const containerRef = useRef<HTMLDivElement>(null)
   const { axies } = useBanningStore()
   const { phase, status } = useStatusStore()
   const { warriors } = useBanningStore()
-  const { address } = useAccount()
+  const { discordId } = useAuthStore()
 
-  const you = warriors.find((warrior) => warrior.discordId === address?.toLowerCase())
+  const you = warriors.find((warrior) => warrior.discordId === discordId)
 
   const shouldShowOpponentIndicator = phase > 1
 
