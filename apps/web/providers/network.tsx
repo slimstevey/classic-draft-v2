@@ -8,9 +8,9 @@ import { useStatusStore } from '@/stores/status'
 import { MESSAGES } from '@repo/shared/constants'
 import { BanningState } from '@repo/shared/states'
 import { CountdownUpdatePayload } from '@repo/shared/types'
-import { getStateCallbacks, Room } from 'colyseus.js'
+import { Room } from 'colyseus.js'
 import { useParams } from 'next/navigation'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type Mode = 'admin' | 'warrior' | 'spectator'
 
@@ -18,24 +18,52 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
   const params = useParams()
   const roomId = (params?.id as string | undefined) ?? null
 
-  const { adminMessage, adminSignature, adminAddress, playerToken } = useAuthStore()
+  const { playerToken, setPlayerSession } = useAuthStore()
   const { instance, setInstance, reconnectionTokens, setReconnectionToken, clearReconnectionToken } = useRoomStore()
   const { setWarriors, setAxies } = useBanningStore()
   const { setStatus, setPhase, setTurn, setCountdown, setEndsAt, setIsBufferTime } = useStatusStore()
 
   const roomRef = useRef<Room<BanningState> | null>(null)
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [authReady, setAuthReady] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (mode === 'spectator') {
+      setAuthReady(true)
+      return
+    }
+    fetch('/api/auth/me')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.authenticated) {
+          setPlayerSession({
+            playerToken: data.playerToken,
+            discordId: data.user.discordId,
+            discordUsername: data.user.discordUsername,
+            discordAvatar: data.user.discordAvatar,
+          })
+        }
+      })
+      .catch(() => {})
+      .finally(() => setAuthReady(true))
+  }, [mode, setPlayerSession])
 
   useEffect(() => {
     if (!roomId) return
+    if (!authReady) return
+    if (mode !== 'spectator' && !playerToken) {
+      setErrorMsg('Not logged in. Please log in with Discord first.')
+      return
+    }
     let cancelled = false
 
     const connect = async () => {
-      if (roomRef.current) return // already connected
+      if (roomRef.current) return
 
       let room: Room<BanningState> | null = null
 
-      // 1) Try reconnect if we have a token for this specific room.
+      // Try fast path: reconnection token (skip if absent or stale)
       const reconnectToken = reconnectionTokens[roomId]
       if (reconnectToken) {
         try {
@@ -46,19 +74,30 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
         }
       }
 
-      // 2) Otherwise initiate a fresh seat reservation appropriate to the mode.
+      // Fresh join — use Colyseus's built-in joinById which handles the reservation
+      // round-trip in a single shot (avoids the manual consume race condition).
       if (!room) {
         try {
-          const reservation = await requestSeatReservation(mode, roomId, {
-            adminMessage,
-            adminSignature,
-            adminAddress,
-            playerToken,
-          })
-          if (!reservation) return // missing auth — caller decides whether to redirect
-          room = await colyseus.consumeSeatReservation<BanningState>(reservation)
+          const options = await buildJoinOptions(mode, roomId, { playerToken })
+          if (!options) {
+            setErrorMsg('Missing auth or join code for this mode')
+            return
+          }
+          if (mode === 'admin') {
+            // For admin, we still need the server to validate auth, so go via HTTP first
+            // then directly consume the reservation in the same tick (no UI yield).
+            const reservation = await requestAdminReservation(roomId, playerToken!)
+            room = await colyseus.consumeSeatReservation<BanningState>(reservation)
+          } else if (mode === 'warrior') {
+            const reservation = await requestWarriorReservation(roomId, playerToken!, options.joinCode!)
+            room = await colyseus.consumeSeatReservation<BanningState>(reservation)
+          } else {
+            // Spectator: use joinById directly — server allows anyone
+            room = await colyseus.joinById<BanningState>(roomId)
+          }
         } catch (err) {
           console.error('[NetworkProvider] failed to join:', err)
+          setErrorMsg(err instanceof Error ? err.message : 'Failed to join room')
           return
         }
       }
@@ -71,15 +110,22 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
       setInstance(room)
       setReconnectionToken(roomId, room.reconnectionToken)
 
-      // Subscribe to state changes — sync to stores.
-      const $ = getStateCallbacks(room)
       room.onStateChange((state: BanningState) => {
-        const parsed = state.toJSON() as unknown as { warriors: any[]; status: any; phase: number; turn: number; endsAt: number; isBufferTime: boolean }
+        const parsed = state.toJSON() as unknown as {
+          warriors: unknown[]
+          status: 'initial' | 'ready' | 'banning' | 'done'
+          phase: number
+          turn: number
+          endsAt: number
+          isBufferTime: boolean
+        }
         if (parsed.warriors && parsed.warriors.length > 0) {
-          setWarriors(parsed.warriors as any)
-          const left = parsed.warriors.find((w) => w.side === 'left')?.pool ?? []
-          const right = parsed.warriors.find((w) => w.side === 'right')?.pool ?? []
-          setAxies([...left, ...right])
+          setWarriors(parsed.warriors as never)
+          const left =
+            (parsed.warriors as { side: string; pool: unknown[] }[]).find((w) => w.side === 'left')?.pool ?? []
+          const right =
+            (parsed.warriors as { side: string; pool: unknown[] }[]).find((w) => w.side === 'right')?.pool ?? []
+          setAxies([...left, ...right] as never)
         }
         setStatus(parsed.status)
         setPhase(parsed.phase)
@@ -88,7 +134,6 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
         setIsBufferTime(parsed.isBufferTime)
       })
 
-      // Authoritative countdown updates from server.
       room.onMessage(MESSAGES.COUNTDOWN_UPDATE, (p: CountdownUpdatePayload) => {
         setCountdown(p.countdown)
         setPhase(p.phase)
@@ -97,15 +142,12 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
         setEndsAt(p.endsAt)
       })
 
-      // Local sub-second ticker derived from endsAt, so the UI counts down smoothly between
-      // 1s server broadcasts. Tolerates tab backgrounding because everything is endsAt-based.
       if (tickerRef.current) clearInterval(tickerRef.current)
       tickerRef.current = setInterval(() => {
         const endsAt = useStatusStore.getState().endsAt
         if (!endsAt) return
-        const now = Date.now() // approximate — server clock vs local clock can drift
+        const now = Date.now()
         const remaining = Math.max(0, endsAt - now)
-        // Only update if it would be visible — avoid pointless re-renders.
         if (Math.abs(remaining - useStatusStore.getState().countdown) > 250) {
           setCountdown(remaining)
         }
@@ -120,7 +162,8 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
       })
 
       room.onError((code, message) => {
-        console.error('[NetworkProvider] error:', code, message)
+        console.error('[NetworkProvider] room error:', code, message)
+        setErrorMsg(`Room error: ${message ?? code}`)
       })
     }
 
@@ -132,58 +175,51 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
         clearInterval(tickerRef.current)
         tickerRef.current = null
       }
-      // Don't leave on unmount — let the room ride through navigation so reconnect works.
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, mode])
+  }, [roomId, mode, authReady, playerToken])
 
   if (!roomId) return <div className='p-4 text-sm text-muted-foreground'>Missing room id.</div>
-  if (!instance) return <div className='p-4 text-sm text-muted-foreground'>Connecting to room {roomId}…</div>
+  if (errorMsg) return <div className='p-4 text-sm text-red-400'>Error: {errorMsg}</div>
+  if (!authReady) return <div className='p-4 text-sm opacity-60'>Loading session…</div>
+  if (!instance) return <div className='p-4 text-sm opacity-60'>Connecting to room {roomId}…</div>
 
   return <>{children}</>
 }
 
-interface AuthContext {
-  adminMessage: string | null
-  adminSignature: string | null
-  adminAddress: string | null
-  playerToken: string | null
-}
-
-async function requestSeatReservation(mode: Mode, roomId: string, auth: AuthContext) {
-  if (mode === 'admin') {
-    if (!auth.adminMessage || !auth.adminSignature || !auth.adminAddress) return null
-    const res = await fetch(`${COLYSEUS_HTTP}/join-admin/${roomId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: auth.adminMessage,
-        signature: auth.adminSignature,
-        address: auth.adminAddress.toLowerCase(),
-      }),
-    })
-    if (!res.ok) throw new Error(`join-admin failed: ${res.status}`)
-    return await res.json()
-  }
+async function buildJoinOptions(mode: Mode, roomId: string, auth: { playerToken: string | null }) {
+  if (mode === 'spectator') return {}
+  if (!auth.playerToken) return null
   if (mode === 'warrior') {
-    if (!auth.playerToken) return null
-    // joinCode is in localStorage from the warrior page or query param
     const joinCode = typeof window !== 'undefined' ? localStorage.getItem(`acd:joinCode:${roomId}`) : null
     if (!joinCode) return null
-    const res = await fetch(`${COLYSEUS_HTTP}/join-warrior/${roomId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerToken: auth.playerToken, joinCode }),
-    })
-    if (!res.ok) throw new Error(`join-warrior failed: ${res.status}`)
-    return await res.json()
+    return { joinCode }
   }
-  // spectator
-  const res = await fetch(`${COLYSEUS_HTTP}/join-spectator/${roomId}`, {
+  return {}
+}
+
+async function requestAdminReservation(roomId: string, playerToken: string) {
+  const res = await fetch(`${COLYSEUS_HTTP}/join-admin/${roomId}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${playerToken}` },
     body: JSON.stringify({}),
   })
-  if (!res.ok) throw new Error(`join-spectator failed: ${res.status}`)
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`join-admin failed: ${res.status} ${text}`)
+  }
+  return await res.json()
+}
+
+async function requestWarriorReservation(roomId: string, playerToken: string, joinCode: string) {
+  const res = await fetch(`${COLYSEUS_HTTP}/join-warrior/${roomId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playerToken, joinCode }),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`join-warrior failed: ${res.status} ${text}`)
+  }
   return await res.json()
 }

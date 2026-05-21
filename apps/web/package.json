@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@colyseus/schema": "^3.0.39",
+    "@colyseus/schema": "3.0.39",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-dropdown-menu": "^2.1.15",
@@ -26,7 +26,7 @@
     "@tanstack/react-query": "^5.76.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "colyseus.js": "^0.16.17",
+    "colyseus.js": "0.16.17",
     "jose": "^5.9.6",
     "lucide-react": "^0.513.0",
     "next": "15.3.8",

@@ -7,20 +7,20 @@ const EnvSchema = z.object({
     .transform((s) => parseInt(s, 10)),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
-  ADMIN_WALLET_ADDRESS: z
+
+  // Comma-separated list of Discord User IDs that are allowed to act as admins.
+  // First one is the primary admin. Others are operators (same privileges in the room layer).
+  ADMIN_DISCORD_IDS: z
     .string()
-    .regex(/^0x[a-fA-F0-9]{40}$/, 'ADMIN_WALLET_ADDRESS must be a valid Ethereum address')
-    .transform((s) => s.toLowerCase()),
-  OPERATOR_WALLET_ADDRESSES: z
-    .string()
-    .default('')
+    .min(1, 'ADMIN_DISCORD_IDS is required (comma-separated Discord user IDs)')
     .transform((s) =>
       s
         .split(',')
-        .map((x) => x.trim().toLowerCase())
+        .map((x) => x.trim())
         .filter(Boolean)
     ),
-  SKY_MAVIS_API_KEY: z.string().min(1, 'SKY_MAVIS_API_KEY is required for fetching Axie data'),
+
+  SKY_MAVIS_API_KEY: z.string().default(''),
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
 })
 
@@ -33,3 +33,7 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data
+
+export function isAdminDiscordId(discordId: string): boolean {
+  return env.ADMIN_DISCORD_IDS.includes(discordId)
+}

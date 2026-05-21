@@ -1,60 +1,62 @@
 import { verifyPlayerToken } from '@/auth/jwt'
-import { verifyAdminSiwe } from '@/auth/siwe'
+import { isAdminDiscordId } from '@/configs/env'
 import { NextFunction, Request, Response } from 'express'
 import { Role } from '@repo/shared/constants'
 import { PlayerSession } from '@repo/shared/types'
 
-// Augment Express request with auth context for downstream handlers.
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       auth?: {
         role: Role
-        // Admin/operator
-        address?: string
-        // Warrior
-        player?: PlayerSession
+        player: PlayerSession
       }
     }
   }
 }
 
 /**
- * Require admin/operator SIWE auth. Reads { message, signature } from request body.
+ * Require admin role. The Discord JWT determines the user; ADMIN_DISCORD_IDS env var
+ * determines whether that user is allowed admin privileges.
  */
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   ;(async () => {
-    const { message, signature } = req.body ?? {}
-    if (!message || !signature) {
-      return res.status(401).json({ error: 'Missing message or signature' })
+    const token = extractToken(req)
+    if (!token) return res.status(401).json({ error: 'Missing player token' })
+    try {
+      const payload = await verifyPlayerToken(token)
+      if (!isAdminDiscordId(payload.discordId)) {
+        return res.status(403).json({ error: 'Not an admin' })
+      }
+      req.auth = { role: Role.ADMIN, player: payload }
+      next()
+    } catch {
+      return res.status(401).json({ error: 'Invalid player token' })
     }
-    const result = await verifyAdminSiwe(message, signature)
-    if (!result.ok) {
-      return res.status(401).json({ error: result.error })
-    }
-    req.auth = { role: result.role, address: result.address }
-    next()
   })().catch(next)
 }
 
 /**
- * Require warrior JWT auth. Reads token from Authorization: Bearer <token> or body.playerToken.
+ * Require any valid Discord token (warrior).
  */
 export function requireWarrior(req: Request, res: Response, next: NextFunction): void {
   ;(async () => {
-    const authHeader = req.headers.authorization
-    const bearer = authHeader?.toLowerCase().startsWith('bearer ') ? authHeader.slice(7) : null
-    const token = bearer ?? req.body?.playerToken ?? null
-    if (!token) {
-      return res.status(401).json({ error: 'Missing player token' })
-    }
+    const token = extractToken(req)
+    if (!token) return res.status(401).json({ error: 'Missing player token' })
     try {
       const payload = await verifyPlayerToken(token)
-      req.auth = { role: Role.WARRIOR, player: payload }
+      const role = isAdminDiscordId(payload.discordId) ? Role.ADMIN : Role.WARRIOR
+      req.auth = { role, player: payload }
       next()
-    } catch (err) {
+    } catch {
       return res.status(401).json({ error: 'Invalid player token' })
     }
   })().catch(next)
+}
+
+function extractToken(req: Request): string | null {
+  const authHeader = req.headers.authorization
+  const bearer = authHeader?.toLowerCase().startsWith('bearer ') ? authHeader.slice(7) : null
+  return bearer ?? req.body?.playerToken ?? null
 }

@@ -1,6 +1,5 @@
 import './globals.css'
 import { Metadata } from 'next'
-import TantoProvider from '@/providers/tanto'
 
 export const metadata: Metadata = {
   title: 'Axie Classic Draft',
@@ -10,9 +9,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang='en'>
-      <body>
-        <TantoProvider>{children}</TantoProvider>
-      </body>
+      <body>{children}</body>
     </html>
   )
 }

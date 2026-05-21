@@ -1,28 +1,31 @@
 import { verifyPlayerToken } from '@/auth/jwt'
-import { verifyAdminSiwe } from '@/auth/siwe'
-import { env } from '@/configs/env'
+import { env, isAdminDiscordId } from '@/configs/env'
 import { requireAdmin } from '@/middlewares/auth'
 import { BanningRoom } from '@/rooms/banning'
 import { generateJoinCode, normalizeJoinCode } from '@/utils/codes'
 import { monitor } from '@colyseus/monitor'
 import { playground } from '@colyseus/playground'
 import config from '@colyseus/tools'
+import { WebSocketTransport } from '@colyseus/ws-transport'
+import { WebSocketTransport } from '@colyseus/ws-transport'
 import { Role } from '@repo/shared/constants'
 import { Side } from '@repo/shared/types'
 import { matchMaker } from 'colyseus'
 import cors from 'cors'
 import { Encoder } from '@colyseus/schema'
 
-// Allow large state syncs for ~10-axie pools.
 Encoder.BUFFER_SIZE = 32 * 1024
 
-// Expose matchmaker controller methods needed for direct joining.
 matchMaker.controller.exposedMethods = ['reconnect', 'joinById']
 
 export default config({
+  options: { transport: new WebSocketTransport() },
+  options: {
+    transport: new WebSocketTransport(),
+  },
   initializeGameServer: (gameServer) => {
     gameServer.define('banning', BanningRoom)
-  },
+  },			
 
   initializeExpress: (app) => {
     app.use(
@@ -36,9 +39,6 @@ export default config({
       app.use('/playground', playground())
     }
 
-    // ----------------------------------------------------------------
-    // Health
-    // ----------------------------------------------------------------
     app.get('/health', (_req, res) => {
       res.json({
         ok: true,
@@ -47,21 +47,14 @@ export default config({
       })
     })
 
-    app.get('/rooms', async (_req, res) => {
-      res.json({ count: matchMaker.stats.local.roomCount })
-    })
-
     // ----------------------------------------------------------------
-    // ADMIN: create a room
-    // Returns { roomId, joinCodes: [{side, code}, {side, code}] }
+    // ADMIN: create a room (Discord JWT, must be in ADMIN_DISCORD_IDS)
     // ----------------------------------------------------------------
     app.post('/create-room', requireAdmin, async (_req, res) => {
       try {
         const leftCode = generateJoinCode()
         const rightCode = generateJoinCode()
 
-        // Pass join codes as room creation options. BanningRoom.onCreate reads these and
-        // pre-creates the warrior slots so admins can immediately share the codes.
         const room = await matchMaker.createRoom('banning', {
           joinCodes: [
             { side: 'left' as Side, code: leftCode },
@@ -83,13 +76,14 @@ export default config({
     })
 
     // ----------------------------------------------------------------
-    // ADMIN: join a room as admin/operator (returns seat reservation for WS)
+    // ADMIN: join a room as admin
     // ----------------------------------------------------------------
     app.post('/join-admin/:roomId', requireAdmin, async (req, res) => {
       try {
         const reservation = await matchMaker.joinById(req.params.roomId, {
-          __role: req.auth!.role,
-          __adminAddress: req.auth!.address,
+          __role: Role.ADMIN,
+          __discordId: req.auth!.player.discordId,
+          __discordUsername: req.auth!.player.discordUsername,
         })
         return res.json(reservation)
       } catch (err) {
@@ -100,7 +94,6 @@ export default config({
 
     // ----------------------------------------------------------------
     // WARRIOR: join a room with Discord JWT + join code
-    // Body: { playerToken, joinCode }
     // ----------------------------------------------------------------
     app.post('/join-warrior/:roomId', async (req, res) => {
       try {
@@ -110,6 +103,11 @@ export default config({
         }
         const player = await verifyPlayerToken(playerToken).catch(() => null)
         if (!player) return res.status(401).json({ error: 'Invalid player token' })
+
+        // Admin should not be able to join as warrior. (Optional — comment out to allow.)
+        if (isAdminDiscordId(player.discordId)) {
+          return res.status(400).json({ error: 'Admins cannot join as warriors' })
+        }
 
         const reservation = await matchMaker.joinById(req.params.roomId, {
           joinCode: normalizeJoinCode(joinCode),
@@ -126,7 +124,7 @@ export default config({
     })
 
     // ----------------------------------------------------------------
-    // SPECTATOR: join a room as a read-only viewer (no auth)
+    // SPECTATOR: read-only, no auth
     // ----------------------------------------------------------------
     app.post('/join-spectator/:roomId', async (req, res) => {
       try {
@@ -141,13 +139,16 @@ export default config({
     })
 
     // ----------------------------------------------------------------
-    // AXIE DATA PROXY — keep Sky Mavis API key server-side
+    // AXIE DATA PROXY
     // ----------------------------------------------------------------
     app.post('/axies/fetch', async (req, res) => {
       try {
         const { axieIds } = req.body ?? {}
         if (!Array.isArray(axieIds) || axieIds.length === 0) {
           return res.status(400).json({ error: 'axieIds must be a non-empty array' })
+        }
+        if (!env.SKY_MAVIS_API_KEY) {
+          return res.status(503).json({ error: 'SKY_MAVIS_API_KEY not configured on server' })
         }
         const safe = axieIds.filter((id: unknown) => typeof id === 'string' && /^\d+$/.test(id))
         if (safe.length === 0) return res.status(400).json({ error: 'no valid axie ids' })
@@ -172,19 +173,6 @@ export default config({
       }
     })
 
-    // ----------------------------------------------------------------
-    // SIWE NONCE — admin sign-in flow on the web
-    // ----------------------------------------------------------------
-    app.post('/siwe/verify', async (req, res) => {
-      const { message, signature } = req.body ?? {}
-      const result = await verifyAdminSiwe(message, signature)
-      if (!result.ok) return res.status(401).json({ error: result.error })
-      return res.json({ ok: true, address: result.address, role: result.role })
-    })
-
-    // ----------------------------------------------------------------
-    // Colyseus monitor (dev only, behind a simple env-gate in prod if needed)
-    // ----------------------------------------------------------------
     if (env.NODE_ENV !== 'production') {
       app.use('/monitor', monitor())
     }
@@ -192,6 +180,7 @@ export default config({
 
   beforeListen: () => {
     console.log(`[server] starting on port ${env.PORT}, env=${env.NODE_ENV}`)
+    console.log(`[server] admin discord IDs:`, env.ADMIN_DISCORD_IDS)
   },
 })
 

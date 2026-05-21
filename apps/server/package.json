@@ -23,18 +23,21 @@
     "typescript": "^5.0.4"
   },
   "dependencies": {
-    "@colyseus/bun-websockets": "^0.16.4",
-    "@colyseus/command": "^0.3.2",
-    "@colyseus/monitor": "^0.16.0",
-    "@colyseus/playground": "^0.16.0",
-    "@colyseus/tools": "^0.16.0",
+    "@colyseus/command": "0.3.2",
+    "@colyseus/core": "0.16.5",
+    "@colyseus/monitor": "0.16.0",
+    "@colyseus/playground": "0.16.4",
+    "@colyseus/schema": "3.0.39",
+    "@colyseus/tools": "0.16.20",
+    "@colyseus/ws-transport": "0.16.5",
     "@repo/shared": "*",
-    "colyseus": "^0.16.0",
+    "colyseus": "0.16.5",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "jose": "^5.9.6",
     "siwe": "^3.0.0",
     "viem": "^2.41.2",
+    "ws": "^8.20.1",
     "zod": "^3.25.20"
   }
 }
