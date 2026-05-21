@@ -90,6 +90,7 @@ export default function PageClient() {
                 you={you}
                 phase={phase}
                 isPreviewing={axie.id === previewAxieId}
+                status={status}
                 onSelect={() => handleSelect(axie)}
                 onBan={() => handleBan(axie)}
               />
@@ -106,6 +107,7 @@ export default function PageClient() {
                 you={you}
                 phase={phase}
                 isPreviewing={axie.id === previewAxieId}
+                status={status}
                 onSelect={() => handleSelect(axie)}
                 onBan={() => handleBan(axie)}
               />
@@ -114,10 +116,10 @@ export default function PageClient() {
         </section>
       </div>
 
-      {/* Bottom preview panel */}
+      {/* Bottom preview panel - just big axie image */}
       {previewAxie && (
         <div className='fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-sm border-t-2 border-white/30 p-4 z-40'>
-          <div className='max-w-5xl mx-auto flex items-center gap-6 relative'>
+          <div className='max-w-3xl mx-auto flex items-center justify-center gap-6 relative'>
             <button
               onClick={() => setPreviewAxieId(null)}
               className='absolute -top-2 -right-2 text-white/60 hover:text-white text-2xl bg-black/50 rounded-full w-8 h-8 flex items-center justify-center'>
@@ -126,39 +128,29 @@ export default function PageClient() {
             <img
               src={computeAxieImageUrl(previewAxie.id)}
               alt={previewAxie.id}
-              className='w-48 h-48 object-contain flex-shrink-0'
+              className='w-56 h-56 object-contain flex-shrink-0'
               draggable={false}
             />
-            <div className='flex-1'>
-              <div className='text-2xl font-bold mb-2'>#{previewAxie.id}</div>
-              <div className='text-sm opacity-70 mb-3'>side: {previewAxie.side} {previewAxie.isBanned && '· BANNED'}</div>
-              <div className='grid grid-cols-2 gap-2'>
-                {(previewAxie.cards || []).map((card: any) => (
-                  <div key={card.id} className='flex items-center gap-2 bg-white/10 rounded p-2'>
-                    <img src={computeAxieCardUrl(card)} alt={card.id} className='w-12 h-12 rounded' />
-                    <div className='text-xs'>
-                      <div className='font-mono opacity-70'>{card.id}</div>
-                      <div className='flex gap-3 mt-1'>
-                        <span>⚔️ {card.attack}</span>
-                        <span>🛡️ {card.defense}</span>
-                      </div>
-                    </div>
+            <div>
+              <div className='text-3xl font-bold mb-2'>#{previewAxie.id}</div>
+              <div className='text-sm opacity-70 mb-4'>{previewAxie.side} side{previewAxie.isBanned && ' · BANNED'}</div>
+              {previewAxie.side !== you?.side && !previewAxie.isBanned && (
+                you?.isBanning ? (
+                  <button
+                    onClick={() => handleBan(previewAxie)}
+                    className='px-6 py-3 bg-red-600 hover:bg-red-700 rounded font-bold text-lg'>
+                    BAN this axie
+                  </button>
+                ) : (
+                  <div className='px-6 py-3 bg-gray-700 text-gray-300 rounded font-bold inline-block cursor-not-allowed'>
+                    Wait for your turn to ban
                   </div>
-                ))}
-              </div>
-              {you?.isBanning && previewAxie.side !== you.side && !previewAxie.isBanned && (
-                <button
-                  onClick={() => handleBan(previewAxie)}
-                  className='mt-4 px-6 py-2 bg-red-600 hover:bg-red-700 rounded font-bold'>
-                  BAN this axie
-                </button>
+                )
               )}
             </div>
           </div>
         </div>
       )}
-
-      {/* End-of-draft summary */}
       {status === 'done' && (
         <DoneOverlay leftAxies={leftAxies} rightAxies={rightAxies} left={left} right={right} />
       )}
@@ -166,7 +158,7 @@ export default function PageClient() {
   )
 }
 
-function AxieCard({ axie, you, phase, isPreviewing, onSelect, onBan }: any) {
+function AxieCard({ axie, you, phase, status, isPreviewing, onSelect, onBan }: any) {
   const isOpponentSide = you && axie.side !== you.side
   const canBan = you?.isBanning && isOpponentSide && axie.isSelected && !axie.isBanned
 
@@ -176,12 +168,15 @@ function AxieCard({ axie, you, phase, isPreviewing, onSelect, onBan }: any) {
   // In phase 1, hide selection state of opponent's axies (you only see your own)
   const hideSelection = phase === 1 && you && axie.side !== you.side
 
+  // In phase 1, hide bans on opponent's axies during the banning phase (reveal when phase 1 ends)
+  const hideBan = phase === 1 && status === 'banning' && you && axie.side !== you.side && axie.isBanned
+
   return (
     <div
       onClick={onSelect}
       className={[
         'relative aspect-square rounded-lg cursor-pointer overflow-hidden border-2 transition',
-        axie.isBanned ? 'border-red-500 grayscale opacity-50' :
+        (axie.isBanned && !hideBan) ? 'border-red-500 grayscale opacity-50' :
         isPreviewing ? 'border-blue-400 ring-2 ring-blue-300 scale-105' :
         (!hideSelection && axie.isSelected) ? 'border-orange-400 ring-2 ring-orange-300' :
         'border-white/20 hover:border-white/50',
@@ -193,7 +188,7 @@ function AxieCard({ axie, you, phase, isPreviewing, onSelect, onBan }: any) {
         draggable={false}
       />
       <div className='absolute bottom-0 left-0 right-0 bg-black/60 text-xs text-center py-0.5'>#{axie.id}</div>
-      {axie.isBanned && (
+      {axie.isBanned && !hideBan && (
         <div className='absolute inset-0 flex items-center justify-center'>
           <div className='text-red-500 text-5xl font-bold'>✕</div>
         </div>
