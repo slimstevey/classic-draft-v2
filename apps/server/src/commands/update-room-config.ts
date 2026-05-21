@@ -46,7 +46,9 @@ export class UpdateRoomConfigCommand extends Command<BanningRoom, UpdateRoomConf
       slot.isAllowToAddPool = data.isAllowToAddPool
       slot.role = Role.WARRIOR
       slot.bufferTime = toMs(BANNING_BUFFER_TIME)
-      slot.pool = buildPool(data.pool)
+      // Mutate existing ArraySchema instead of replacing so Colyseus syncs the change
+      slot.pool.clear()
+      buildPool(data.pool).forEach((axie: Axie) => slot.pool.push(axie))
 
       if (isNewSlot) {
         slot.codeConsumed = false
