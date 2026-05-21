@@ -11,6 +11,7 @@ import Image from 'next/image'
 
 export default function PageClient() {
   const { axies } = useBanningStore()
+  console.log('[BattlePage] axies count:', axies.length, 'sides:', axies.map((a:any) => a.side))
 
   return (
     <section className='w-screen h-screen'>
