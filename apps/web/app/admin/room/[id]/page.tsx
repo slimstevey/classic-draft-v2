@@ -78,6 +78,8 @@ export default function AdminRoomPage() {
     })
     if (!res.ok) throw new Error(`axie fetch failed: ${res.status}`)
     const data = await res.json()
+    console.log('[fetchAxiePool] response:', side, JSON.stringify(data).slice(0, 500))
+    console.log('[fetchAxiePool] requested ids:', axieIds)
     return axieIds.map((axieId) => {
       const axie = data.data?.[`axie${axieId}`]
       const cards: Axie['cards'] = []
@@ -131,6 +133,7 @@ export default function AdminRoomPage() {
           },
         ],
       }
+      console.log('[updateConfig] sending payload:', JSON.stringify(payload, null, 2))
       instance.send(MESSAGES.UPDATE_ROOM_CONFIG, payload)
       setInfo('Room config updated.')
     } catch (err) {
