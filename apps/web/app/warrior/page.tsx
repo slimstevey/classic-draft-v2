@@ -1,6 +1,5 @@
 'use client'
 
-import { COLYSEUS_HTTP } from '@/libs/colyseus'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
@@ -23,7 +22,6 @@ function Inner() {
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState<string | null>(search.get('error'))
 
-  // On mount, sync session from /api/auth/me (so a returning user picks up their cookie).
   useEffect(() => {
     fetch('/api/auth/me')
       .then((r) => r.json())
@@ -56,25 +54,9 @@ function Inner() {
     setError(null)
     if (!playerToken || !roomId.trim() || !joinCode.trim()) return
     setJoining(true)
-    try {
-      const res = await fetch(`${COLYSEUS_HTTP}/join-warrior/${roomId.trim()}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerToken, joinCode: joinCode.trim() }),
-      })
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        setError(j.error ?? `Failed to join (HTTP ${res.status})`)
-        setJoining(false)
-        return
-      }
-      // Stash the code so NetworkProvider can re-attach on reconnect to this room.
-      localStorage.setItem(`acd:joinCode:${roomId.trim()}`, joinCode.trim())
-      router.push(`/battle/${roomId.trim()}`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-      setJoining(false)
-    }
+    // Stash code for NetworkProvider to read. Actual WebSocket join happens on /battle page.
+    localStorage.setItem(`acd:joinCode:${roomId.trim()}`, joinCode.trim())
+    router.push(`/battle/${roomId.trim()}`)
   }
 
   return (
