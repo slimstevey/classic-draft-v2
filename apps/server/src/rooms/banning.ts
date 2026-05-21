@@ -9,6 +9,10 @@ import { SelectAxieCommand } from '@/commands/axie-select'
 import { UpdatePlayerInfoCommand } from '@/commands/update-player-info'
 import { UpdateRoomConfigCommand } from '@/commands/update-room-config'
 import { isAllPlayersReady } from '@/utils'
+import { verifyPlayerToken } from '@/auth/jwt'
+import { isAdminDiscordId } from '@/configs/env'
+import { normalizeJoinCode } from '@/utils/codes'
+import { Role } from '@repo/shared/constants'
 import { Dispatcher } from '@colyseus/command'
 import { Client, Delayed, Room } from '@colyseus/core'
 import {
@@ -90,17 +94,57 @@ export class BanningRoom extends Room<BanningState> {
     this.setSimulationInterval((_dt) => this.update())
   }
 
-  onJoin(client: Client, options: JoinRoomOptions & { __role?: string; __discordId?: string; __discordUsername?: string; __discordAvatar?: string | null; }) {
-    // The HTTP layer (app.ts) has already verified the caller's auth and attached resolved
-    // identity fields onto the join options. We trust those here.
+
+  async onAuth(_client: Client, options: any) {
+    const role = options.__role
+    if (role === 'SPECTATOR') {
+      return { role: 'SPECTATOR' }
+    }
+    if (!options.playerToken) {
+      throw new Error('Missing playerToken')
+    }
+    const player = await verifyPlayerToken(options.playerToken).catch(() => null)
+    if (!player) {
+      throw new Error('Invalid playerToken')
+    }
+    if (role === 'ADMIN') {
+      if (!isAdminDiscordId(player.discordId)) {
+        throw new Error('Not an admin')
+      }
+      return {
+        role: 'ADMIN',
+        discordId: player.discordId,
+        discordUsername: player.discordUsername,
+        discordAvatar: player.discordAvatar,
+      }
+    }
+    if (role === 'WARRIOR') {
+      if (isAdminDiscordId(player.discordId)) {
+        throw new Error('Admins cannot join as warriors')
+      }
+      if (!options.joinCode) {
+        throw new Error('Missing joinCode')
+      }
+      return {
+        role: 'WARRIOR',
+        discordId: player.discordId,
+        discordUsername: player.discordUsername,
+        discordAvatar: player.discordAvatar,
+        joinCode: normalizeJoinCode(options.joinCode),
+      }
+    }
+    throw new Error('Unknown role')
+  }
+
+  onJoin(client: Client, _options: any, auth: any) {
     this.dispatcher.dispatch(new OnJoinCommand(), {
       sessionId: client.sessionId,
-      role: options.__role ?? 'spectator',
-      discordId: options.__discordId,
-      discordUsername: options.__discordUsername,
-      discordAvatar: options.__discordAvatar ?? null,
-      joinCode: options.joinCode,
-          })
+      role: auth?.role ?? 'SPECTATOR',
+      discordId: auth?.discordId,
+      discordUsername: auth?.discordUsername,
+      discordAvatar: auth?.discordAvatar ?? null,
+      joinCode: auth?.joinCode,
+    })
   }
 
   async onLeave(client: Client, consented: boolean) {

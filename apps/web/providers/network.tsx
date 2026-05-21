@@ -19,7 +19,7 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
   const roomId = (params?.id as string | undefined) ?? null
 
   const { playerToken, setPlayerSession } = useAuthStore()
-  const { instance, setInstance, reconnectionTokens, setReconnectionToken, clearReconnectionToken } = useRoomStore()
+  const { instance, setInstance } = useRoomStore()
   const { setWarriors, setAxies } = useBanningStore()
   const { setStatus, setPhase, setTurn, setCountdown, setEndsAt, setIsBufferTime } = useStatusStore()
 
@@ -63,43 +63,18 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
 
       let room: Room<BanningState> | null = null
 
-      // Try fast path: reconnection token (skip if absent or stale)
-      const reconnectToken = reconnectionTokens[roomId]
-      if (reconnectToken) {
-        try {
-          room = await colyseus.reconnect<BanningState>(reconnectToken)
-        } catch {
-          clearReconnectionToken(roomId)
-          room = null
-        }
-      }
-
-      // Fresh join — use Colyseus's built-in joinById which handles the reservation
-      // round-trip in a single shot (avoids the manual consume race condition).
-      if (!room) {
-        try {
-          const options = await buildJoinOptions(mode, roomId, { playerToken })
-          if (!options) {
-            setErrorMsg('Missing auth or join code for this mode')
-            return
-          }
-          if (mode === 'admin') {
-            // For admin, we still need the server to validate auth, so go via HTTP first
-            // then directly consume the reservation in the same tick (no UI yield).
-            const reservation = await requestAdminReservation(roomId, playerToken!)
-            room = await colyseus.consumeSeatReservation<BanningState>(reservation)
-          } else if (mode === 'warrior') {
-            const reservation = await requestWarriorReservation(roomId, playerToken!, options.joinCode!)
-            room = await colyseus.consumeSeatReservation<BanningState>(reservation)
-          } else {
-            // Spectator: use joinById directly — server allows anyone
-            room = await colyseus.joinById<BanningState>(roomId)
-          }
-        } catch (err) {
-          console.error('[NetworkProvider] failed to join:', err)
-          setErrorMsg(err instanceof Error ? err.message : 'Failed to join room')
+      try {
+        // Use joinById directly — Colyseus client handles reservation + WS in one shot
+        const options = await buildJoinOptions(mode, roomId, { playerToken })
+        if (options === null) {
+          setErrorMsg('Missing auth or join code for this mode')
           return
         }
+        room = await colyseus.joinById<BanningState>(roomId, options)
+      } catch (err) {
+        console.error('[NetworkProvider] failed to join:', err)
+        setErrorMsg(err instanceof Error ? err.message : 'Failed to join room')
+        return
       }
 
       if (cancelled || !room) {
@@ -108,7 +83,6 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
       }
       roomRef.current = room
       setInstance(room)
-      setReconnectionToken(roomId, room.reconnectionToken)
 
       room.onStateChange((state: BanningState) => {
         const parsed = state.toJSON() as unknown as {
@@ -188,38 +162,15 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
 }
 
 async function buildJoinOptions(mode: Mode, roomId: string, auth: { playerToken: string | null }) {
-  if (mode === 'spectator') return {}
+  if (mode === 'spectator') {
+    return { __role: 'SPECTATOR' }
+  }
   if (!auth.playerToken) return null
   if (mode === 'warrior') {
     const joinCode = typeof window !== 'undefined' ? localStorage.getItem(`acd:joinCode:${roomId}`) : null
     if (!joinCode) return null
-    return { joinCode }
+    return { __role: 'WARRIOR', playerToken: auth.playerToken, joinCode }
   }
-  return {}
-}
-
-async function requestAdminReservation(roomId: string, playerToken: string) {
-  const res = await fetch(`${COLYSEUS_HTTP}/join-admin/${roomId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${playerToken}` },
-    body: JSON.stringify({}),
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`join-admin failed: ${res.status} ${text}`)
-  }
-  return await res.json()
-}
-
-async function requestWarriorReservation(roomId: string, playerToken: string, joinCode: string) {
-  const res = await fetch(`${COLYSEUS_HTTP}/join-warrior/${roomId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playerToken, joinCode }),
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`join-warrior failed: ${res.status} ${text}`)
-  }
-  return await res.json()
+  // admin
+  return { __role: 'ADMIN', playerToken: auth.playerToken }
 }
