@@ -16,3 +16,121 @@ body {
   color: var(--foreground);
   font-family: system-ui, -apple-system, sans-serif;
 }
+.s-1-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: 0 0;
+  -webkit-mask-position: 0 0;
+--
+.s-2-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -797px 0;
+  -webkit-mask-position: -797px 0;
+--
+.s-3-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -1594px 0;
+  -webkit-mask-position: -1594px 0;
+--
+.s-4-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -2391px 0;
+  -webkit-mask-position: -2391px 0;
+--
+.s-5-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -3188px 0;
+  -webkit-mask-position: -3188px 0;
+--
+.s-6-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -3985px 0;
+  -webkit-mask-position: -3985px 0;
+--
+.s-7-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -4782px 0;
+  -webkit-mask-position: -4782px 0;
+--
+.s-8-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -5579px 0;
+  -webkit-mask-position: -5579px 0;
+--
+.s-9-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -6376px 0;
+  -webkit-mask-position: -6376px 0;
+--
+.s-10-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -7173px 0;
+  -webkit-mask-position: -7173px 0;
+.s-1-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: 0 0;
+  -webkit-mask-position: 0 0;
+--
+.s-2-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -797px 0;
+  -webkit-mask-position: -797px 0;
+--
+.s-3-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -1594px 0;
+  -webkit-mask-position: -1594px 0;
+--
+.s-4-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -2391px 0;
+  -webkit-mask-position: -2391px 0;
+--
+.s-5-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -3188px 0;
+  -webkit-mask-position: -3188px 0;
+--
+.s-6-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -3985px 0;
+  -webkit-mask-position: -3985px 0;
+--
+.s-7-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -4782px 0;
+  -webkit-mask-position: -4782px 0;
+--
+.s-8-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -5579px 0;
+  -webkit-mask-position: -5579px 0;
+--
+.s-9-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -6376px 0;
+  -webkit-mask-position: -6376px 0;
+--
+.s-10-l {
+  mask-image: url('/slots/slots-sprite.svg');
+  -webkit-mask-image: url('/slots/slots-sprite.svg');
+  mask-position: -7173px 0;
+  -webkit-mask-position: -7173px 0;

@@ -48,7 +48,7 @@ export function BanningSlot({ axie, slotConfig, onClick }: BanningSlotProps) {
   return (
     <div
       className={cn(
-        'relative cursor-pointer overflow-hidden pointer-events-auto',
+        'absolute cursor-pointer overflow-hidden pointer-events-auto',
         axie.isSelected && shouldShowIndicator ? 'bg-[#E99C37]' : 'bg-[#D9D9D9]',
         axie.isBanned && shouldShowIndicator && 'bg-[#716868]',
       )}
