@@ -167,7 +167,11 @@ export default function PageClient() {
 }
 
 function AxieCard({ axie, you, phase, isPreviewing, onSelect, onBan }: any) {
-  const canBan = you?.isBanning && axie.side !== you.side && axie.isSelected && !axie.isBanned
+  const isOpponentSide = you && axie.side !== you.side
+  const canBan = you?.isBanning && isOpponentSide && axie.isSelected && !axie.isBanned
+
+  // Show the "Not your turn" state when you select an opponent's axie but it's not your turn
+  const showWaitingState = isOpponentSide && axie.isSelected && !you?.isBanning && !axie.isBanned
 
   // In phase 1, hide selection state of opponent's axies (you only see your own)
   const hideSelection = phase === 1 && you && axie.side !== you.side
@@ -200,6 +204,11 @@ function AxieCard({ axie, you, phase, isPreviewing, onSelect, onBan }: any) {
           className='absolute top-1 right-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded shadow-lg z-10'>
           BAN
         </button>
+      )}
+      {showWaitingState && (
+        <div className='absolute top-1 right-1 px-2 py-1 bg-gray-700 text-gray-300 text-xs font-bold rounded shadow-lg z-10 cursor-not-allowed'>
+          Wait your turn
+        </div>
       )}
     </div>
   )
