@@ -26,7 +26,7 @@ export enum MESSAGES {
 // Default countdown per turn (seconds).
 export const DEFAULT_BANNING_COUNTDOWN = 60
 // Extra display offset so the UI shows "60" for a full second before counting.
-export const BANNING_COUNTDOWN_OFFSET = 2
+export const BANNING_COUNTDOWN_OFFSET = 0
 // Total buffer time pool each warrior gets at the start of phase 2.
 export const BANNING_BUFFER_TIME = DEFAULT_BANNING_COUNTDOWN * 2
 // How long Colyseus allows a player to reconnect after a drop (seconds).
