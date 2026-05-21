@@ -90,7 +90,7 @@ export class BanningRoom extends Room<BanningState> {
     this.setSimulationInterval((_dt) => this.update())
   }
 
-  onJoin(client: Client, options: JoinRoomOptions & { __role?: string; __discordId?: string; __discordUsername?: string; __discordAvatar?: string | null; __adminAddress?: string }) {
+  onJoin(client: Client, options: JoinRoomOptions & { __role?: string; __discordId?: string; __discordUsername?: string; __discordAvatar?: string | null; }) {
     // The HTTP layer (app.ts) has already verified the caller's auth and attached resolved
     // identity fields onto the join options. We trust those here.
     this.dispatcher.dispatch(new OnJoinCommand(), {
@@ -100,8 +100,7 @@ export class BanningRoom extends Room<BanningState> {
       discordUsername: options.__discordUsername,
       discordAvatar: options.__discordAvatar ?? null,
       joinCode: options.joinCode,
-      adminAddress: options.__adminAddress,
-    })
+          })
   }
 
   async onLeave(client: Client, consented: boolean) {

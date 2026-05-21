@@ -60,7 +60,7 @@ export class UpdateRoomConfigCommand extends Command<BanningRoom, UpdateRoomConf
   }
 }
 
-function buildPool(poolData: AxieDTO[]): ArraySchema<Axie> {
+function buildPool(poolData: AxieDTO[]): any {
   const pool = new ArraySchema<Axie>()
   poolData.forEach((axieData) => {
     const axie = new Axie(axieData.id, axieData.genes, [], axieData.side)
