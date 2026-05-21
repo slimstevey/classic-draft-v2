@@ -7,6 +7,7 @@ FROM base AS deps
 COPY package.json bun.lock* ./
 COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
+COPY packages/axie-mixer/package.json packages/axie-mixer/
 RUN bun install --frozen-lockfile || bun install
 
 # ---- build ----
@@ -14,7 +15,6 @@ FROM deps AS build
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app/apps/web
-# Build-time env: only NEXT_PUBLIC_* are baked in. Everything else is read at runtime.
 ARG NEXT_PUBLIC_COLYSEUS_WS_URL
 ARG NEXT_PUBLIC_COLYSEUS_HTTP_URL
 ENV NEXT_PUBLIC_COLYSEUS_WS_URL=$NEXT_PUBLIC_COLYSEUS_WS_URL
