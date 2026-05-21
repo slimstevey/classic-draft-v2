@@ -1,7 +1,7 @@
 import { Warrior } from '@repo/shared/states'
 
 export function isAllPlayersReady(warriors: ArrayLike<Warrior>): boolean {
-  const arr = Array.from(warriors as Iterable<Warrior>)
+  const arr = Array.from(warriors as unknown as Iterable<Warrior>)
   if (arr.length === 0) return false
   return arr.every((w) => w.isReady)
 }
