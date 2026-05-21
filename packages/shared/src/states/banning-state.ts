@@ -46,6 +46,7 @@ export class Warrior extends Schema {
   @type('string') displayName: string = ''
   // Per-side join code (admin shares with player).
   @type('string') joinCode: string = ''
+  @type('string') inspectedAxieId: string = ''
   @type('boolean') codeConsumed: boolean = false
   @type([Axie]) pool = new ArraySchema<Axie>()
   @type('boolean') isAllowToAddPool: boolean = false
