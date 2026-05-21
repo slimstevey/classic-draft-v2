@@ -109,7 +109,9 @@ function DoneOverlay({ leftAxies, rightAxies, left, right }: any) {
   const rightRemaining = rightAxies.filter((a: any) => !a.isBanned)
 
   return (
-    <div className='fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-6'>
+    <div
+      className='fixed inset-0 z-[100] flex items-center justify-center p-6 bg-cover bg-center bg-no-repeat'
+      style={{ backgroundImage: "linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.92)), url('/banner.webp')" }}>
       <div className='bg-emerald-950 border border-emerald-500/30 rounded-2xl p-8 max-w-6xl w-full max-h-[90vh] overflow-y-auto'>
         <h1 className='text-4xl font-bold text-center mb-8'>DRAFT COMPLETE</h1>
         <div className='grid grid-cols-2 gap-8'>

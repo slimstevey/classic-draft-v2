@@ -1,6 +1,7 @@
 'use client'
 
 import { COLYSEUS_HTTP } from '@/libs/colyseus'
+import { computeAxieImageUrl } from '@/libs/utils'
 import { useAuthStore } from '@/stores/auth'
 import { useBanningStore } from '@/stores/banning'
 import { useRoomStore } from '@/stores/room'
@@ -28,7 +29,7 @@ interface JoinCodeRecord {
 export default function AdminRoomPage() {
   const { id } = useParams<{ id: string }>()
   const { instance } = useRoomStore()
-  const { warriors } = useBanningStore()
+  const { warriors, axies } = useBanningStore()
   const { playerToken } = useAuthStore()
   const [creatingRoom, setCreatingRoom] = useState(false)
 
@@ -238,6 +239,55 @@ export default function AdminRoomPage() {
             </div>
           </div>
         </header>
+
+        {/* Mini Draft View */}
+        <section className='border border-emerald-500/30 rounded-lg p-4 bg-black/20'>
+          <div className='flex items-center justify-between mb-3'>
+            <h2 className='font-semibold'>Live Draft View</h2>
+            <div className='text-xs opacity-70 font-mono'>
+              {status === 'done' ? (
+                <span className='text-yellow-300 font-bold'>✓ DRAFT COMPLETE</span>
+              ) : status === 'banning' ? (
+                <span>
+                  Phase {phase} · Turn {turn} · {Math.ceil(countdown / 1000)}s
+                  {(() => {
+                    const banner = warriors.find((w: any) => w.isBanning && w.bannedCount > 0)
+                    return banner ? <span className='ml-2 text-yellow-300'>· {banner.displayName || banner.side} banning ({banner.bannedCount} left)</span> : null
+                  })()}
+                </span>
+              ) : (
+                <span>{status}</span>
+              )}
+            </div>
+          </div>
+          {axies.length === 0 ? (
+            <div className='text-xs opacity-60 italic'>No axies loaded yet. Update Room Config below to load pools.</div>
+          ) : (
+            <div className='grid grid-cols-2 gap-3'>
+              {['left', 'right'].map((side) => {
+                const w = warriors.find((x: any) => x.side === side)
+                const sideAxies = axies.filter((a: any) => a.side === side)
+                return (
+                  <div key={side}>
+                    <div className='text-sm font-semibold mb-1'>{w?.displayName || side.toUpperCase()}{w?.isBanning && <span className='ml-2 text-yellow-300 text-xs'>BANNING</span>}</div>
+                    <div className='grid grid-cols-5 gap-1'>
+                      {sideAxies.map((a: any) => (
+                        <div key={a.id} className={`relative aspect-square rounded overflow-hidden border ${a.isBanned ? 'border-red-500 opacity-40 grayscale' : a.isSelected ? 'border-orange-400' : 'border-white/10'}`}>
+                          <img src={computeAxieImageUrl(a.id)} alt={a.id} className='w-full h-full object-cover' />
+                          {a.isBanned && (
+                            <div className='absolute inset-0 flex items-center justify-center'>
+                              <div className='text-red-500 text-xl font-bold'>✕</div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
 
         {info && <div className='text-xs bg-blue-500/10 border border-blue-500/30 rounded px-3 py-2'>{info}</div>}
 
