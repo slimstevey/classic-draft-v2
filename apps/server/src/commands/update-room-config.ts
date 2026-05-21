@@ -57,6 +57,9 @@ export class UpdateRoomConfigCommand extends Command<BanningRoom, UpdateRoomConf
     })
 
     console.log('[✅][UpdateRoomConfig]', sessionId)
+    this.state.warriors.forEach((w) => {
+      console.log('[UpdateRoomConfig] warrior', w.side, 'pool size:', w.pool.length, 'displayName:', w.displayName)
+    })
   }
 }
 

@@ -93,6 +93,7 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
           isBufferTime: boolean
         }
         if (parsed.warriors && parsed.warriors.length > 0) {
+          console.log('[NetworkProvider] state warriors:', parsed.warriors.map((w: any) => ({ side: w.side, poolSize: w.pool?.length || 0, displayName: w.displayName })))
           setWarriors(parsed.warriors as never)
           const left =
             (parsed.warriors as { side: string; pool: unknown[] }[]).find((w) => w.side === 'left')?.pool ?? []
