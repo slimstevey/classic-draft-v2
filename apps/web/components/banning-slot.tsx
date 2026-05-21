@@ -28,6 +28,7 @@ export function BanningSlot({ axie, slotConfig, onClick }: BanningSlotProps) {
   const you = warriors.find((warrior) => warrior.discordId === discordId)
 
   const allowToBan = you?.isBanning && axie.side !== you.side
+  if (axie.isSelected) console.log('[BanningSlot] selected axie', axie.id, 'you:', you, 'allowToBan:', allowToBan, 'axie.side:', axie.side, 'you.side:', you?.side, 'isBanning:', you?.isBanning)
 
   const shouldShowIndicator = useMemo(() => {
     if (isInspector) {
