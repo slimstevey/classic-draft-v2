@@ -50,19 +50,11 @@ export default function PageClient() {
 
   return (
     <main className='min-h-screen bg-gradient-to-b from-emerald-900 to-emerald-950 text-white p-6 pb-72'>
-      <header className='flex items-center justify-between mb-6'>
-        <div>
-          <div className='text-2xl font-bold'>{you?.displayName || 'You'} <span className='text-xs opacity-60'>(you)</span></div>
-          <div className='text-xs opacity-60'>side: {you?.side ?? '—'}</div>
-        </div>
+      <header className='flex items-center justify-center mb-6'>
         <div className='text-center'>
           <div className='text-5xl font-mono font-bold'>{seconds}s</div>
           <div className='text-xs opacity-70'>{status} · phase {phase} · turn {turn}{isBufferTime ? ' · BUFFER' : ''}</div>
           {you?.isBanning && you.bannedCount > 0 && <div className='text-yellow-300 text-sm font-bold mt-1'>YOUR TURN — ban {you.bannedCount} axies</div>}
-        </div>
-        <div className='text-right'>
-          <div className='text-2xl font-bold'>{opp?.displayName || 'Opponent'}</div>
-          <div className='text-xs opacity-60'>side: {opp?.side ?? '—'}</div>
         </div>
       </header>
 
