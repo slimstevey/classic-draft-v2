@@ -43,6 +43,8 @@ export class BanningRoom extends Room<BanningState> {
   state = new BanningState()
   dispatcher = new Dispatcher(this)
   maxClients = 20
+  autoDispose = false
+  private disposeTimeout: NodeJS.Timeout | null = null
 
   private tickInterval: Delayed | null = null
   private endTimeout: Delayed | null = null
@@ -272,6 +274,9 @@ export class BanningRoom extends Room<BanningState> {
   private finishBanning() {
     this.clearAllTimers()
     this.state.status = 'done'
+    // Keep room alive 4 hours so spectators can rewatch the draft
+    if (this.disposeTimeout) clearTimeout(this.disposeTimeout)
+    this.disposeTimeout = setTimeout(() => this.disconnect(), 4 * 60 * 60 * 1000)
     this.state.endsAt = 0
     this.state.startedAt = 0
     this.state.isBufferTime = false
