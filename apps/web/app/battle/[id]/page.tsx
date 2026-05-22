@@ -133,7 +133,7 @@ export default function PageClient() {
             />
             <div>
               <div className='text-3xl font-bold mb-2'>#{previewAxie.id}</div>
-              <div className='text-sm opacity-70 mb-4'>{previewAxie.side} side{previewAxie.isBanned && ' · BANNED'}</div>
+              <div className='text-sm opacity-70 mb-4'>{previewAxie.isBanned ? 'BANNED' : ''}</div>
               {previewAxie.side !== you?.side && !previewAxie.isBanned && (
                 you?.isBanning ? (
                   <button

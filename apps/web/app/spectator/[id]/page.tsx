@@ -68,7 +68,7 @@ export default function PageClient() {
             <div>
               <div className='text-sm font-bold text-blue-300 mb-1'>{inspector?.displayName} is looking at:</div>
               <div className='text-2xl font-bold'>#{inspectedAxie.id}</div>
-              <div className='text-xs opacity-70'>{inspectedAxie.side} side{inspectedAxie.isBanned && ' · BANNED'}</div>
+              <div className='text-xs opacity-70'>{inspectedAxie.isBanned ? 'BANNED' : ''}</div>
             </div>
           </div>
         </div>
