@@ -11,6 +11,7 @@ export enum Role {
 // All message types exchanged between server <-> client.
 export enum MESSAGES {
   INSPECT_AXIE = 'inspect-axie',
+  UNBAN_AXIE = 'unban-axie',
   UPDATE_PLAYER_INFO = 'update-player-info',
   UPDATE_ROOM_CONFIG = 'update-room-config',
   SELECT_AXIE = 'select-axie',

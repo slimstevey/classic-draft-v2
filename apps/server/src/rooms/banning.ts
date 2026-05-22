@@ -1,5 +1,6 @@
 import { BanAxieCommand } from '@/commands/axie-ban'
 import { ForceSkipTurnCommand } from '@/commands/force-skip-turn'
+import { UnbanAxieCommand } from '@/commands/axie-unban'
 import { KickWarriorCommand } from '@/commands/kick-warrior'
 import { OnCreateCommand } from '@/commands/on-create-room'
 import { OnJoinCommand } from '@/commands/on-join-room'
@@ -213,6 +214,13 @@ export class BanningRoom extends Room<BanningState> {
     this.onMessage(MESSAGES.INSPECT_AXIE, (client, message: any) => {
       const w = this.state.findWarriorBySession(client.sessionId)
       if (w) w.inspectedAxieId = message?.axieId ?? ''
+    })
+
+    this.onMessage(MESSAGES.UNBAN_AXIE, (client, message: any) => {
+      this.dispatcher.dispatch(new UnbanAxieCommand(), {
+        sessionId: client.sessionId,
+        axieId: message?.axieId ?? '',
+      })
     })
   }
 
