@@ -15,8 +15,6 @@ export default function PageClient() {
   const { status, phase, turn, countdown, isBufferTime } = useStatusStore()
 
   const [previewAxieId, setPreviewAxieId] = useState<string | null>(null)
-  const [showChangeBanModal, setShowChangeBanModal] = useState(false)
-  const [pendingNewBan, setPendingNewBan] = useState<any>(null)
 
   const you = warriors.find((w: any) => w.discordId === discordId)
   const opp = warriors.find((w: any) => w.discordId !== discordId)
@@ -47,17 +45,7 @@ export default function PageClient() {
     setPreviewAxieId(null)
   }
 
-  // Phase 1 only — swap your existing ban for a new one
-  const handleChangeBan = (newAxie: any) => {
-    if (!you) return
-    const existingBan = axies.find((a: any) => a.isBanned && a.side !== you.side && a.side === newAxie.side)
-    if (!existingBan) return
-    instance?.send(MESSAGES.UNBAN_AXIE, { axieId: existingBan.id })
-    setTimeout(() => instance?.send(MESSAGES.BAN_AXIE, { axie: newAxie }), 100)
-    setShowChangeBanModal(false)
-    setPendingNewBan(null)
-    setPreviewAxieId(null)
-  }
+
 
   const activeBanner = warriors.find((w: any) => w.isBanning && w.bannedCount > 0)
   const showPhase2Banner = status === 'banning' && phase === 2 && activeBanner
@@ -156,11 +144,9 @@ export default function PageClient() {
                     BAN this axie
                   </button>
                 ) : phase === 1 && status === 'banning' && axies.find((a: any) => a.isBanned && a.side !== you?.side && a.side === previewAxie.side) ? (
-                  <button
-                    onClick={() => { setPendingNewBan(previewAxie); setShowChangeBanModal(true) }}
-                    className='px-6 py-3 bg-amber-600 hover:bg-amber-700 rounded font-bold text-lg'>
-                    Change ban to this axie
-                  </button>
+                  <div className='px-6 py-3 bg-gray-700 text-gray-300 rounded font-bold inline-block cursor-not-allowed'>
+                    ✅ You already banned an axie · waiting for opponent / timer
+                  </div>
                 ) : (
                   <div className='px-6 py-3 bg-gray-700 text-gray-300 rounded font-bold inline-block cursor-not-allowed'>
                     Wait for your turn to ban
@@ -175,41 +161,6 @@ export default function PageClient() {
         <DoneOverlay leftAxies={leftAxies} rightAxies={rightAxies} left={left} right={right} />
       )}
 
-      {/* Change ban confirmation modal */}
-      {showChangeBanModal && pendingNewBan && you && (
-        <div className='fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6'>
-          <div className='bg-emerald-950 border border-amber-500/50 rounded-2xl p-8 max-w-md w-full'>
-            <h2 className='text-2xl font-bold mb-4'>Change your ban?</h2>
-            <p className='mb-2 text-sm opacity-80'>You already banned:</p>
-            {(() => {
-              const existing = axies.find((a: any) => a.isBanned && a.side !== you.side && a.side === pendingNewBan.side)
-              return existing ? (
-                <div className='flex items-center gap-3 mb-4 bg-red-900/30 rounded-lg p-3'>
-                  <img src={computeAxieImageUrl(existing.id)} alt={existing.id} className='w-16 h-16 object-contain' />
-                  <div className='font-mono text-lg'>#{existing.id}</div>
-                </div>
-              ) : null
-            })()}
-            <p className='mb-2 text-sm opacity-80'>Replace with:</p>
-            <div className='flex items-center gap-3 mb-6 bg-amber-900/30 rounded-lg p-3'>
-              <img src={computeAxieImageUrl(pendingNewBan.id)} alt={pendingNewBan.id} className='w-16 h-16 object-contain' />
-              <div className='font-mono text-lg'>#{pendingNewBan.id}</div>
-            </div>
-            <div className='flex gap-3 justify-end'>
-              <button
-                onClick={() => { setShowChangeBanModal(false); setPendingNewBan(null) }}
-                className='px-5 py-2 bg-gray-700 hover:bg-gray-600 rounded font-bold'>
-                Cancel
-              </button>
-              <button
-                onClick={() => handleChangeBan(pendingNewBan)}
-                className='px-5 py-2 bg-amber-600 hover:bg-amber-700 rounded font-bold'>
-                Confirm Change
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   )
 }

@@ -293,7 +293,21 @@ export default function AdminRoomPage() {
 
         {/* Join codes */}
         <section className='border rounded-lg p-4'>
-          <h2 className='font-semibold mb-3'>Join Codes</h2>
+          <div className='flex items-center justify-between mb-3 gap-3 flex-wrap'>
+            <h2 className='font-semibold'>Join Codes</h2>
+            <button
+              onClick={() => {
+                const origin = window.location.origin
+                const leftName = leftWarrior?.displayName || 'Left player'
+                const rightName = rightWarrior?.displayName || 'Right player'
+                const msg = `${leftName} — Here's your link, go here:\n${origin}/warrior?room=${id}&code=${leftCode}\n\n${rightName} — Here's your link, go here:\n${origin}/warrior?room=${id}&code=${rightCode}`
+                copy(msg)
+                setInfo('Copied both player messages to clipboard. Paste in Discord/etc.')
+              }}
+              className='px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded shadow'>
+              📋 Copy Both Player Messages
+            </button>
+          </div>
           <p className='text-xs opacity-60 mb-3'>
             DM each player their code via Discord. Each code is single-use; if the wrong person
             joins, click <em>Kick</em> to free it for the correct player.
