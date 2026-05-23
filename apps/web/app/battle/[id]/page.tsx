@@ -135,7 +135,7 @@ export default function PageClient() {
             />
             <div>
               <div className='text-3xl font-bold mb-2'>#{previewAxie.id}</div>
-              <div className='text-sm opacity-70 mb-4'>{previewAxie.isBanned ? 'BANNED' : ''}</div>
+              <div className='text-sm opacity-70 mb-4'>{(() => { const hideForOpp = phase === 1 && status === 'banning' && you && previewAxie.side === you.side && previewAxie.isBanned; return previewAxie.isBanned && !hideForOpp ? 'BANNED' : '' })()}</div>
               {previewAxie.side !== you?.side && !previewAxie.isBanned && (
                 you?.isBanning && you.bannedCount > 0 ? (
                   <button
@@ -175,8 +175,8 @@ function AxieCard({ axie, you, phase, status, isPreviewing, onSelect, onBan }: a
   // In phase 1, hide selection state of opponent's axies (you only see your own)
   const hideSelection = phase === 1 && you && axie.side !== you.side
 
-  // Phase 1: hide ALL bans (both sides) until phase 1 ends. Nobody sees anything banned mid-phase.
-  const hideBan = phase === 1 && status === 'banning' && axie.isBanned
+  // Phase 1: hide bans your opponent placed (on your own side). Show bans YOU placed (on opponent's side) so you have confirmation.
+  const hideBan = phase === 1 && status === 'banning' && you && axie.isBanned && axie.side === you.side
 
   return (
     <div
