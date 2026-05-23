@@ -212,6 +212,7 @@ export class BanningRoom extends Room<BanningState> {
     })
 
     this.onMessage(MESSAGES.INSPECT_AXIE, (client, message: any) => {
+      if (this.state.phase !== 2 || this.state.status !== 'banning') return
       const w = this.state.findWarriorBySession(client.sessionId)
       if (w) w.inspectedAxieId = message?.axieId ?? ''
     })
