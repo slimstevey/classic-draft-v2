@@ -25,6 +25,11 @@ export class SelectAxieCommand extends Command<BanningRoom, SelectAxiePayload & 
       return
     }
 
+    // In phase 1, do NOT broadcast selection — leaks opponent's intent. Client uses local state for previews.
+    if (this.state.phase === 1) {
+      return
+    }
+
     owner.pool.forEach((a) => {
       a.isSelected = false
     })
