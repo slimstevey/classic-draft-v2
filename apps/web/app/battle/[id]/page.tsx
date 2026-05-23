@@ -175,8 +175,8 @@ function AxieCard({ axie, you, phase, status, isPreviewing, onSelect, onBan }: a
   // In phase 1, hide selection state of opponent's axies (you only see your own)
   const hideSelection = phase === 1 && you && axie.side !== you.side
 
-  // In phase 1, hide bans on opponent's axies during the banning phase (reveal when phase 1 ends)
-  const hideBan = phase === 1 && status === 'banning' && you && axie.side !== you.side && axie.isBanned
+  // Phase 1: hide ALL bans (both sides) until phase 1 ends. Nobody sees anything banned mid-phase.
+  const hideBan = phase === 1 && status === 'banning' && axie.isBanned
 
   return (
     <div
