@@ -1,9 +1,7 @@
 'use client'
 
-import { useRoomStore } from '@/stores/room'
-import { DEFAULT_BANNING_COUNTDOWN, MESSAGES } from '@repo/shared/constants'
-import { toMs, toSeconds } from '@repo/shared/utils'
-import { useEffect, useState, useRef } from 'react'
+import { toSeconds } from '@repo/shared/utils'
+import { useRef } from 'react'
 import NumberFlow from '@number-flow/react'
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
@@ -16,51 +14,35 @@ export default function BanningIndicator() {
   const container = useRef<HTMLDivElement>(null)
   const progress = useRef<HTMLDivElement>(null)
 
-  const [countdown, setCountdown] = useState(0)
-  const [phase, setPhase] = useState(0)
-  const [isBufferTime, setIsBufferTime] = useState(false)
-  const lastUpdateTime = useRef(Date.now())
-  const serverCountdown = useRef(0)
-
-  const { status } = useStatusStore()
-  const { instance } = useRoomStore()
+  // Single source of truth: the status store, fed by NetworkProvider's one
+  // deadline-based ticker. This component previously ran its own countdown
+  // extrapolated from message *arrival* times — network jitter made the big
+  // number visibly bounce ±1s ("goes back and forth"). It also stacked a new
+  // COUNTDOWN_UPDATE handler on every status change without unsubscribing.
+  const { status, phase, countdown, endsAt, startedAt, isBufferTime } = useStatusStore()
   const { warriors } = useBanningStore()
 
   const isLeftBanning = warriors.find((warrior) => warrior.side === 'left')?.isBanning
   const isRightBanning = warriors.find((warrior) => warrior.side === 'right')?.isBanning
 
-  useEffect(() => {
-    instance?.onMessage(MESSAGES.COUNTDOWN_UPDATE, (message) => {
-      serverCountdown.current = message.countdown
-      lastUpdateTime.current = Date.now()
-      setPhase(message.phase)
-      setIsBufferTime(message.isBufferTime)
-    })
+  // Monotonic display guard: within one deadline, the shown second may only
+  // decrease. Late clock-offset refinements can nudge the raw remaining up a
+  // few hundred ms — without the guard that reads as the timer ticking UP.
+  const displayGuard = useRef({ endsAt: 0, floor: Infinity })
+  if (displayGuard.current.endsAt !== endsAt) {
+    displayGuard.current = { endsAt, floor: Infinity }
+  }
+  const rawSeconds = Math.floor(toSeconds(countdown))
+  const displaySeconds = Math.min(rawSeconds, displayGuard.current.floor)
+  displayGuard.current.floor = displaySeconds
 
-    const interval = setInterval(() => {
-      if (serverCountdown.current > 0) {
-        const now = Date.now()
-        const elapsed = now - lastUpdateTime.current
-        const newCountdown = Math.max(0, serverCountdown.current - elapsed)
-        setCountdown(newCountdown)
-      }
-    }, 50)
-
-    return () => {
-      clearInterval(interval)
-      setCountdown(0)
-      setPhase(0)
-      serverCountdown.current = 0
-      lastUpdateTime.current = Date.now()
-    }
-  }, [instance, status])
-
-  // Format countdown to show only whole seconds
-  const displaySeconds = Math.floor(toSeconds(countdown))
+  // Progress relative to THIS turn's real duration (60s, 120s, or the buffer
+  // pool) instead of a hardcoded 60s — the bar no longer jumps between turns.
+  const totalMs = Math.max(1, endsAt - startedAt)
 
   useGSAP(
     () => {
-      const percentage = (countdown / toMs(DEFAULT_BANNING_COUNTDOWN)) * 100
+      const percentage = (countdown / totalMs) * 100
       let endColor = `rgba(16,96,31,100)`
       if (percentage > 60) {
         endColor = `rgba(8,206,51,100)`
@@ -83,7 +65,7 @@ export default function BanningIndicator() {
 
   useGSAP(
     () => {
-      const percentage = (countdown / toMs(DEFAULT_BANNING_COUNTDOWN)) * 100
+      const percentage = (countdown / totalMs) * 100
       let endColor = `rgba(16,96,31,100)`
       if (percentage > 60) {
         endColor = `rgba(8,206,51,100)`
