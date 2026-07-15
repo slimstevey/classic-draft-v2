@@ -1,6 +1,6 @@
 import { verifyPlayerToken } from '@/auth/jwt'
 import { env, isAdminDiscordId } from '@/configs/env'
-import { requireAdmin } from '@/middlewares/auth'
+import { requireOperator } from '@/middlewares/auth'
 import { generateJoinCode } from '@/utils/codes'
 import { Role } from '@repo/shared/constants'
 import { Side } from '@repo/shared/types'
@@ -14,8 +14,9 @@ export function registerRoutes(app: Express) {
     res.json({ ok: true, rooms: matchMaker.stats.local.roomCount, ts: Date.now() })
   })
 
-  app.post('/create-room', requireAdmin, async (_req, res) => {
+  app.post('/create-room', requireOperator, async (req, res) => {
     try {
+      console.log('[/create-room] by', req.auth?.player.discordUsername, `(${req.auth?.role})`)
       const leftCode = generateJoinCode()
       const rightCode = generateJoinCode()
       const room = await matchMaker.createRoom('banning', {
