@@ -1,5 +1,12 @@
 import { z } from 'zod'
 
+function splitIds(s: string): string[] {
+  return s
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean)
+}
+
 const EnvSchema = z.object({
   PORT: z
     .string()
@@ -8,17 +15,16 @@ const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
 
-  // Comma-separated list of Discord User IDs that are allowed to act as admins.
-  // First one is the primary admin. Others are operators (same privileges in the room layer).
+  // Comma-separated Discord User IDs with FULL admin privileges.
   ADMIN_DISCORD_IDS: z
     .string()
     .min(1, 'ADMIN_DISCORD_IDS is required (comma-separated Discord user IDs)')
-    .transform((s) =>
-      s
-        .split(',')
-        .map((x) => x.trim())
-        .filter(Boolean)
-    ),
+    .transform(splitIds),
+
+  // Comma-separated Discord User IDs with OPERATOR privileges: they can create rooms
+  // and run drafts (skip turn, kick, reset, edit config) but are a distinct tier so
+  // future admin-only actions don't need an env migration.
+  OPERATOR_DISCORD_IDS: z.string().default('').transform(splitIds),
 
   SKY_MAVIS_API_KEY: z.string().default(''),
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
@@ -36,4 +42,15 @@ export const env = parsed.data
 
 export function isAdminDiscordId(discordId: string): boolean {
   return env.ADMIN_DISCORD_IDS.includes(discordId)
+}
+
+export function isOperatorDiscordId(discordId: string): boolean {
+  return env.OPERATOR_DISCORD_IDS.includes(discordId)
+}
+
+/** Resolve the highest privilege tier for a Discord user. */
+export function roleForDiscordId(discordId: string): 'admin' | 'operator' | null {
+  if (isAdminDiscordId(discordId)) return 'admin'
+  if (isOperatorDiscordId(discordId)) return 'operator'
+  return null
 }
