@@ -1,6 +1,7 @@
 'use client'
 
 import colyseus from '@/libs/colyseus'
+import { attachClockSync, applyBroadcastTime, serverNow } from '@/libs/server-clock'
 import { useAuthStore } from '@/stores/auth'
 import { useBanningStore } from '@/stores/banning'
 import { useRoomStore } from '@/stores/room'
@@ -19,9 +20,9 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
   const roomId = (params?.id as string | undefined) ?? null
 
   const { playerToken, setPlayerSession } = useAuthStore()
-  const { instance, setInstance } = useRoomStore()
+  const { instance, setInstance, setReconnectionToken, clearReconnectionToken } = useRoomStore()
   const { setWarriors, setAxies } = useBanningStore()
-  const { setStatus, setPhase, setTurn, setCountdown, setEndsAt, setIsBufferTime } = useStatusStore()
+  const { setStatus, setPhase, setTurn, setCountdown, setEndsAt, setStartedAt, setIsBufferTime } = useStatusStore()
 
   const roomRef = useRef<Room<BanningState> | null>(null)
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -80,8 +81,21 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
         room?.leave()
         return
       }
+      wireRoom(room)
+    }
+
+    const wireRoom = (room: Room<BanningState>) => {
       roomRef.current = room
       setInstance(room)
+      setErrorMsg(null)
+
+      // Persist the reconnection token so a dropped socket can resume the
+      // same seat (server holds it open for RECONNECTION_WINDOW_SECONDS).
+      setReconnectionToken(roomId!, room.reconnectionToken)
+
+      // Clock sync: countdowns are computed against the server clock, so a
+      // skewed local clock can't make the timer disagree with the server.
+      const detachClock = attachClockSync(room)
 
       room.onStateChange((state: BanningState) => {
         const parsed = state.toJSON() as unknown as {
@@ -90,10 +104,10 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
           phase: number
           turn: number
           endsAt: number
+          startedAt: number
           isBufferTime: boolean
         }
         if (parsed.warriors && parsed.warriors.length > 0) {
-          console.log('[NetworkProvider] state warriors:', parsed.warriors.map((w: any) => ({ side: w.side, poolSize: w.pool?.length || 0, displayName: w.displayName })))
           setWarriors(parsed.warriors as never)
           const left =
             (parsed.warriors as { side: string; pool: unknown[] }[]).find((w) => w.side === 'left')?.pool ?? []
@@ -105,40 +119,78 @@ export default function NetworkProvider({ children, mode }: { children: React.Re
         setPhase(parsed.phase)
         setTurn(parsed.turn)
         setEndsAt(parsed.endsAt)
+        setStartedAt(parsed.startedAt)
         setIsBufferTime(parsed.isBufferTime)
       })
 
       room.onMessage(MESSAGES.COUNTDOWN_UPDATE, (p: CountdownUpdatePayload) => {
-        setCountdown(p.countdown)
+        // One-way clock fallback until the first ping round-trip completes.
+        if (typeof p.serverTime === 'number') applyBroadcastTime(p.serverTime)
         setPhase(p.phase)
         setTurn(p.turn)
         setIsBufferTime(p.isBufferTime)
         setEndsAt(p.endsAt)
       })
 
+      // SINGLE countdown writer. Deadline minus server-clock estimate — the
+      // broadcast no longer writes countdown directly, so there are no longer
+      // two sources fighting over the same value (the old back-and-forth).
       if (tickerRef.current) clearInterval(tickerRef.current)
       tickerRef.current = setInterval(() => {
-        const endsAt = useStatusStore.getState().endsAt
-        if (!endsAt) return
-        const now = Date.now()
-        const remaining = Math.max(0, endsAt - now)
-        if (Math.abs(remaining - useStatusStore.getState().countdown) > 250) {
-          setCountdown(remaining)
-        }
-      }, 200)
+        const { endsAt, status } = useStatusStore.getState()
+        if (!endsAt || status !== 'banning') return
+        setCountdown(Math.max(0, endsAt - serverNow()))
+      }, 100)
 
       room.onLeave((code) => {
         console.log('[NetworkProvider] left room, code=', code)
+        detachClock()
         if (tickerRef.current) {
           clearInterval(tickerRef.current)
           tickerRef.current = null
         }
+        roomRef.current = null
+
+        // Consented leave (navigation) -> done. Abnormal close (network blip,
+        // server restart, sleep) -> resume the same seat via the token.
+        if (code === 1000 || cancelled) {
+          clearReconnectionToken(roomId!)
+          return
+        }
+        attemptReconnect(0)
       })
 
       room.onError((code, message) => {
         console.error('[NetworkProvider] room error:', code, message)
         setErrorMsg(`Room error: ${message ?? code}`)
       })
+    }
+
+    const attemptReconnect = (attempt: number) => {
+      if (cancelled) return
+      if (attempt >= 8) {
+        setErrorMsg('Connection lost. Please refresh the page.')
+        return
+      }
+      const token = useRoomStore.getState().reconnectionTokens[roomId!]
+      if (!token) {
+        // No seat to resume (e.g. spectator) — plain rejoin.
+        setInstance(null)
+        connect()
+        return
+      }
+      const backoff = Math.min(500 * 2 ** attempt, 8000)
+      setTimeout(async () => {
+        if (cancelled) return
+        try {
+          const room = await colyseus.reconnect<BanningState>(token)
+          console.log('[NetworkProvider] reconnected, seat resumed')
+          wireRoom(room)
+        } catch (err) {
+          console.warn(`[NetworkProvider] reconnect attempt ${attempt + 1} failed`, err)
+          attemptReconnect(attempt + 1)
+        }
+      }, backoff)
     }
 
     connect()
