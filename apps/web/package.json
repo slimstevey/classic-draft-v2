@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@colyseus/schema": "3.0.39",
+    "@colyseus/schema": "3.0.76",
     "@gsap/react": "^2.1.2",
     "@number-flow/react": "^0.6.0",
     "@pixi-spine/all-3.8": "^4.0.6",
