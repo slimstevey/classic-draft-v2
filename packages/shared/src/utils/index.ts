@@ -1,5 +1,5 @@
 import { PhaseKeys, TurnKeys, BanningConfig, TurnConfig, PhaseConfig } from '../types'
-import { BANNING_CONFIG, Role } from '../constants'
+import { BANNING_CONFIG } from '../constants'
 
 export function toMs(seconds: number): number {
   return seconds * 1000
@@ -7,17 +7,6 @@ export function toMs(seconds: number): number {
 
 export function toSeconds(ms: number): number {
   return ms / 1000
-}
-
-/**
- * Determine the role of a wallet address.
- * Admin/operator allowlists are passed in (server reads from env, client just uses for display).
- */
-export function roleOfAddress(address: string, adminAddress: string, operatorAddresses: string[]): Role {
-  const a = address.toLowerCase()
-  if (a === adminAddress.toLowerCase()) return Role.ADMIN
-  if (operatorAddresses.map((x) => x.toLowerCase()).includes(a)) return Role.OPERATOR
-  return Role.NONE
 }
 
 export function getBanningConfig(): BanningConfig
