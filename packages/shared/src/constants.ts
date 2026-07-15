@@ -22,6 +22,10 @@ export enum MESSAGES {
   FORCE_SKIP_TURN = 'force-skip-turn',
   KICK_WARRIOR = 'kick-warrior',
   ROOM_ERROR = 'room-error',
+  // Client <-> server clock sync. Client sends { t0: Date.now() }, server replies
+  // { t0, serverTime }. Client derives an RTT-corrected offset so countdowns are
+  // computed against the SERVER clock, immune to local clock skew.
+  TIME_SYNC = 'time-sync',
 }
 
 // Default countdown per turn (seconds).
