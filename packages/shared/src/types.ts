@@ -141,7 +141,19 @@ export interface CountdownUpdatePayload {
   phase: number
   turn: number
   isBufferTime: boolean
-  endsAt: number // absolute server clock time when this turn ends
+  endsAt: number // absolute server epoch ms when this turn ends
+  serverTime: number // server's Date.now() at broadcast — lets clients estimate clock offset
+}
+
+// Client -> server
+export interface TimeSyncRequest {
+  t0: number // client's Date.now() when the request was sent
+}
+
+// Server -> requesting client
+export interface TimeSyncResponse {
+  t0: number // echoed back for RTT measurement
+  serverTime: number // server's Date.now() when it replied
 }
 
 // Server -> single client
