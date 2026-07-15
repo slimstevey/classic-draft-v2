@@ -1,5 +1,5 @@
 import { verifyPlayerToken } from '@/auth/jwt'
-import { isAdminDiscordId } from '@/configs/env'
+import { isAdminDiscordId, roleForDiscordId } from '@/configs/env'
 import { NextFunction, Request, Response } from 'express'
 import { Role } from '@repo/shared/constants'
 import { PlayerSession } from '@repo/shared/types'
@@ -30,6 +30,27 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
         return res.status(403).json({ error: 'Not an admin' })
       }
       req.auth = { role: Role.ADMIN, player: payload }
+      next()
+    } catch {
+      return res.status(401).json({ error: 'Invalid player token' })
+    }
+  })().catch(next)
+}
+
+/**
+ * Require admin OR operator role — both tiers can create and manage rooms.
+ */
+export function requireOperator(req: Request, res: Response, next: NextFunction): void {
+  ;(async () => {
+    const token = extractToken(req)
+    if (!token) return res.status(401).json({ error: 'Missing player token' })
+    try {
+      const payload = await verifyPlayerToken(token)
+      const tier = roleForDiscordId(payload.discordId)
+      if (!tier) {
+        return res.status(403).json({ error: 'Not an admin or operator' })
+      }
+      req.auth = { role: tier === 'admin' ? Role.ADMIN : Role.OPERATOR, player: payload }
       next()
     } catch {
       return res.status(401).json({ error: 'Invalid player token' })
