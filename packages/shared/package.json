@@ -17,6 +17,6 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@colyseus/schema": "^3.0.39"
+    "@colyseus/schema": "3.0.76"
   }
 }
