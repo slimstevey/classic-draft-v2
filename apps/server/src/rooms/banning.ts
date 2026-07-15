@@ -11,7 +11,7 @@ import { UpdatePlayerInfoCommand } from '@/commands/update-player-info'
 import { UpdateRoomConfigCommand } from '@/commands/update-room-config'
 import { isAllPlayersReady } from '@/utils'
 import { verifyPlayerToken } from '@/auth/jwt'
-import { isAdminDiscordId } from '@/configs/env'
+import { isAdminDiscordId, roleForDiscordId } from '@/configs/env'
 import { normalizeJoinCode } from '@/utils/codes'
 import { Role } from '@repo/shared/constants'
 import { Dispatcher } from '@colyseus/command'
@@ -33,6 +33,7 @@ import {
   PlayerReadyPayload,
   ResetBanPayload,
   SelectAxiePayload,
+  TimeSyncRequest,
   TurnConfig,
   TurnOrder,
   UpdatePlayerInfoPayload,
@@ -86,11 +87,14 @@ export class BanningRoom extends Room<BanningState> {
       throw new Error('Invalid playerToken')
     }
     if (role === 'admin') {
-      if (!isAdminDiscordId(player.discordId)) {
-        throw new Error('Not an admin')
+      // Admins AND operators may use the admin surface; their actual tier is
+      // recorded so future admin-only actions can distinguish them.
+      const tier = roleForDiscordId(player.discordId)
+      if (!tier) {
+        throw new Error('Not an admin or operator')
       }
       return {
-        role: 'admin',
+        role: tier, // 'admin' | 'operator'
         discordId: player.discordId,
         discordUsername: player.discordUsername,
         discordAvatar: player.discordAvatar,
@@ -217,6 +221,12 @@ export class BanningRoom extends Room<BanningState> {
       if (w) w.inspectedAxieId = message?.axieId ?? ''
     })
 
+    // Clock sync: reply directly to the asking client so it can compute an
+    // RTT-corrected offset between its Date.now() and the server's.
+    this.onMessage(MESSAGES.TIME_SYNC, (client, message: TimeSyncRequest) => {
+      client.send(MESSAGES.TIME_SYNC, { t0: message?.t0 ?? 0, serverTime: Date.now() })
+    })
+
     this.onMessage(MESSAGES.UNBAN_AXIE, (client, message: any) => {
       this.dispatcher.dispatch(new UnbanAxieCommand(), {
         sessionId: client.sessionId,
@@ -310,7 +320,8 @@ export class BanningRoom extends Room<BanningState> {
     this.state.setPlayersBanning(playersBanning)
 
     const durationMs = toMs(config.countdown) + toMs(BANNING_COUNTDOWN_OFFSET)
-    const now = this.clock.currentTime
+    // Epoch ms, always. Clients compute remaining = endsAt - serverNow().
+    const now = Date.now()
     this.state.startedAt = now
     this.state.endsAt = now + durationMs
 
@@ -323,7 +334,7 @@ export class BanningRoom extends Room<BanningState> {
     this.endTimeout = this.clock.setTimeout(() => {
       this.tickInterval?.clear()
       this.tickInterval = null
-      this.state.endsAt = this.clock.currentTime
+      this.state.endsAt = Date.now()
 
       if (opts.useBufferOnExpiry) {
         this.handleTurnCompletionWithBuffer(nextStep)
@@ -348,24 +359,18 @@ export class BanningRoom extends Room<BanningState> {
 
     this.state.isBufferTime = true
     const bufferDurationMs = active.bufferTime
-    const now = this.clock.currentTime
+    const now = Date.now()
     this.state.startedAt = now
     this.state.endsAt = now + bufferDurationMs
 
     this.broadcast(MESSAGES.COUNTDOWN_UPDATE, this.makeCountdownPayload())
 
-    const startedAt = now
-
+    // Drain the visible buffer pool and broadcast. Advancement is handled in
+    // exactly ONE place — checkAndAdvanceBanning (called by BanAxieCommand) —
+    // so a ban and this interval can never race to advance the turn twice.
     this.tickInterval = this.clock.setInterval(() => {
-      const elapsed = this.clock.currentTime - startedAt
-      active.bufferTime = Math.max(0, bufferDurationMs - elapsed)
+      active.bufferTime = Math.max(0, this.state.endsAt - Date.now())
       this.broadcast(MESSAGES.COUNTDOWN_UPDATE, this.makeCountdownPayload())
-
-      if (active.bannedCount === 0) {
-        this.clearAllTimers()
-        this.state.isBufferTime = false
-        nextStep()
-      }
     }, 1000)
 
     this.endTimeout = this.clock.setTimeout(() => {
@@ -380,8 +385,15 @@ export class BanningRoom extends Room<BanningState> {
     const hasPending = this.state.warriors.some((w) => w.isBanning && w.bannedCount > 0)
     if (hasPending) return
 
+    // Banned during buffer time -> bank the unused reserve, to the millisecond,
+    // instead of whatever the 1-second drain interval last wrote.
+    if (this.state.isBufferTime) {
+      const active = this.state.warriors.find((w) => w.isBanning)
+      if (active) active.bufferTime = Math.max(0, this.state.endsAt - Date.now())
+    }
+
     this.clearAllTimers()
-    this.state.endsAt = this.clock.currentTime
+    this.state.endsAt = Date.now()
     this.state.isBufferTime = false
     this.broadcast(MESSAGES.COUNTDOWN_UPDATE, this.makeCountdownPayload())
 
@@ -389,8 +401,13 @@ export class BanningRoom extends Room<BanningState> {
   }
 
   forceSkipCurrentTurn() {
+    // Skipping mid-buffer burns the remaining reserve — that's the point of a force skip.
+    if (this.state.isBufferTime) {
+      const active = this.state.warriors.find((w) => w.isBanning)
+      if (active) active.bufferTime = 0
+    }
     this.clearAllTimers()
-    this.state.endsAt = this.clock.currentTime
+    this.state.endsAt = Date.now()
     this.state.isBufferTime = false
     this.broadcast(MESSAGES.COUNTDOWN_UPDATE, this.makeCountdownPayload())
 
@@ -457,7 +474,7 @@ export class BanningRoom extends Room<BanningState> {
   }
 
   private makeCountdownPayload(): CountdownUpdatePayload {
-    const now = this.clock.currentTime
+    const now = Date.now()
     const remaining = Math.max(0, this.state.endsAt - now)
     return {
       countdown: remaining,
@@ -465,6 +482,7 @@ export class BanningRoom extends Room<BanningState> {
       turn: this.state.turn,
       isBufferTime: this.state.isBufferTime,
       endsAt: this.state.endsAt,
+      serverTime: now,
     }
   }
 }
